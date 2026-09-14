@@ -7337,7 +7337,15 @@ document.onkeydown = function (e) {
 
 var elem_principal = document.documentElement;
 
+function autoFullscreenEnabled() {
+    try {
+        var v = localStorage.getItem("gwent-auto-fullscreen");
+        return v === null ? true : v === "true";
+    } catch (e) { return true; }
+}
+
 async function openFullscreen() {
+    if (!autoFullscreenEnabled()) return;
     try {
         if (elem_principal.requestFullscreen) elem_principal.requestFullscreen();
         else if (elem_principal.webkitRequestFullscreen) elem_principal.webkitRequestFullscreen();
@@ -7470,6 +7478,13 @@ var iniciou = false,
 var playingOnline;
 
 window.onload = function () {
+    var fsCheckbox = document.getElementById("auto-fullscreen-checkbox");
+    if (fsCheckbox) {
+        fsCheckbox.checked = autoFullscreenEnabled();
+        fsCheckbox.addEventListener("change", function () {
+            try { localStorage.setItem("gwent-auto-fullscreen", String(fsCheckbox.checked)); } catch (e) { }
+        });
+    }
     dimensionar();
     playingOnline = window.location.href == "https://randompianist.github.io/gwent-classic-v2.0/";
     document.getElementById("load_text").style.display = "none";
