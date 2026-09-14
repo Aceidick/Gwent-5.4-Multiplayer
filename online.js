@@ -798,6 +798,16 @@ const GwentOnline = {
     const prevOwner = this._decisionOwner;
     const prevContext = this._effectContext;
     const prevEffectDecisionSerial = this._effectDecisionSerial;
+    // Scope the RNG to the effect owner so each player's delayed effects
+    // (roundStart/roundEnd/turnStart/turnEnd) consume an independent RNG
+    // stream. The shared gameRng would otherwise diverge when asynchronous
+    // effect bodies (notifications, animations) interleave differently on
+    // the two peers, causing randomized effects such as Skellige's round-3
+    // graveyard revive to select different cards and desync at the round-phase
+    // barrier. deckRng is already per-role and seed-stable across browsers.
+    const prevRngScope = this.rngScope;
+    const ownerRole = player ? this.roleOfPlayer(player) : null;
+    if (ownerRole) this.rngScope = ownerRole;
     this._decisionOwner = player || prevOwner || null;
     // Decision ids inside a delayed/owned effect must be deterministic on both
     // peers. A match-global serial is unsafe because local-only UI interactions
@@ -815,6 +825,7 @@ const GwentOnline = {
         this._decisionOwner = prevOwner;
         this._effectContext = prevContext;
         this._effectDecisionSerial = prevEffectDecisionSerial;
+        this.rngScope = prevRngScope;
       }
     }
   },
