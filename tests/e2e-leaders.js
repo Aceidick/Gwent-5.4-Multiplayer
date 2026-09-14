@@ -629,6 +629,48 @@ const EMISSARY = 'ne_vreemde';
     await committed(t,'emhyr_emperor forced action carousel');
   }
 
+  // 30. faction-ability confirm popup regression. activateFactionAbility's
+  // "Use faction ability?" confirm must be a local-only UI prompt (suppressed
+  // popup-wire), never a synced beginDecision, regardless of which player
+  // object triggers it. If the suppression leaks, the peer that runs the
+  // activate for a remote chooser opens a beginDecision and waits for a
+  // popup-choice that never arrives -> "Timed out waiting for popup choice
+  // (...:faction:...:activate:popup:0)". Exercise both the currPlayer path
+  // (legit use) and the non-currPlayer path (inspecting/cancelling) and verify
+  // no desync, no pending popup waiters, and the match stays active.
+  for (const scenario of ['curr','noncurr']) {
+    const t = await setup('re_radovid_mad_king', {reEnable:true});
+    for (const p of [A,B]) await p.evaluate((arg)=>{
+      const actor = GwentOnline.playerOf(arg.role);
+      actor.deck.faction = 'redania';
+      actor.factionAbilityUses = 1;
+      const btn = document.getElementById('faction-ability-'+actor.tag);
+      if (btn) { btn.classList.remove('hide','fade','noclick'); }
+      window.__facErr = null;
+      window.__facDone = false;
+      window.__sentChoices = [];
+      const origSend = GwentOnline.send.bind(GwentOnline);
+      GwentOnline.send = function(m){ if(m && m.t==='popup-choice') window.__sentChoices.push(m); return origSend(m); };
+    }, {role:t.role});
+    const targetPeer = scenario==='curr' ? t.local : t.remote;
+    await targetPeer.evaluate(()=>{
+      const me = player_me;
+      me.activateFactionAbility().then(()=>window.__facDone=true, e=>window.__facErr=String(e));
+    });
+    await targetPeer.waitForFunction(()=>!!Popup.curr, null, {timeout:20000}).catch(()=>{});
+    await targetPeer.evaluate(()=>{ if (Popup.curr) Popup.curr.selectNo(); });
+    await targetPeer.waitForFunction(()=>window.__facDone, null, {timeout:20000});
+    await A.waitForTimeout(600);
+    // No popup-choice should have been sent (confirm popup is local-only).
+    const sent = await targetPeer.evaluate(()=>window.__sentChoices);
+    assert(sent.length===0, scenario+' faction confirm popup sent no popup-choice ('+sent.length+')');
+    // No peer should be left waiting on a faction:activate popup decision.
+    const [wa, wb] = await Promise.all([A,B].map(p=>p.evaluate(()=>GwentOnline.waiters.filter(w=>w.types && w.types.includes && w.types.includes('popup-choice')).length || 0)));
+    assert(wa===0 && wb===0, scenario+' no peer waits on faction:activate popup (A='+wa+' B='+wb+')');
+    assert(await A.evaluate(()=>GwentOnline.active) && await B.evaluate(()=>GwentOnline.active), scenario+' match active after faction confirm cancel');
+    assert(await targetPeer.evaluate(()=>!window.__facErr), scenario+' no activate error');
+  }
+
   assert(errs.A.length===0,'no host errors '+errs.A.join(' | '));
   assert(errs.B.length===0,'no guest errors '+errs.B.join(' | '));
   if(failed) throw Error('Leader regression assertions failed');
