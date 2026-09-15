@@ -5709,6 +5709,7 @@ class DeckMaker {
         this.start_op_deck;
         this.me_deck_index = 0;
         this.op_deck_index = 0;
+        this.op_leader_choice = "normal";
 
         this.change_elem = document.getElementById("change-faction");
         this.change_elem.addEventListener("click", () => this.selectFaction(), false);
@@ -5825,6 +5826,7 @@ if (toggleBtn) {
 
         document.getElementById("select-deck").addEventListener("click", () => this.selectDeck(), false);
         document.getElementById("select-op-deck").addEventListener("click", () => this.selectOPDeck(), false);
+        document.getElementById("select-op-leader").addEventListener("click", () => this.selectOPLeader(), false);
         document.getElementById("download-deck").addEventListener("click", () => this.downloadDeck(), false);
         document.getElementById("add-file").addEventListener("change", () => this.uploadDeck(), false);
 document.getElementById("save-internal-deck").addEventListener("click", () => this.saveDeckInternal(), false);
@@ -6332,6 +6334,44 @@ makePreview(index, num, container_elem, cards) {
             }
         }, () => true, false, true);
         Carousel.curr.index = this.op_deck_index;
+        Carousel.curr.update();
+    }
+
+    // Friend-mode only: lets a player choose how the opponent's leader is set.
+    // "Random Leader" locks the opponent's leader+faction to a seeded random
+    // pick (deterministic across both peers); "Normal" lets the opponent pick
+    // their leader+faction freely. Each player's choice applies to the OTHER
+    // player. Only the deck composition stays editable under Random Leader.
+    selectOPLeader() {
+        let container = new CardContainer();
+        container.cards = [
+            {
+                abilities: [],
+                name: "Normal",
+                row: "leader",
+                filename: "normal",
+                desc_name: "Normal",
+                desc: "<p>Opponent chooses their own leader and faction freely.</p>",
+                faction: "faction"
+            },
+            {
+                abilities: [],
+                name: "Random Leader",
+                row: "leader",
+                filename: "random",
+                desc_name: "Random Leader",
+                desc: "<p>Opponent's leader and faction are chosen at random (locked). Opponent may still build their deck freely.</p>",
+                faction: "faction"
+            }
+        ];
+        const cur = (this.op_leader_choice === "random") ? 1 : 0;
+        ui.queueCarousel(container, 1, (c, i) => {
+            this.op_leader_choice = (i === 1) ? "random" : "normal";
+            document.getElementById("op-leader-name").innerHTML = this.op_leader_choice === "random" ? "Random Leader" : "Normal";
+            if (window.GwentOnline && typeof window.GwentOnline.onOpLeaderChoice === "function")
+                window.GwentOnline.onOpLeaderChoice(this.op_leader_choice);
+        }, () => true, false, true);
+        Carousel.curr.index = cur;
         Carousel.curr.update();
     }
 
