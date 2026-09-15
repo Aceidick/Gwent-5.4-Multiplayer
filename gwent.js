@@ -5693,6 +5693,12 @@ class DeckMaker {
         this.leader_elem.children[1].addEventListener("mouseout", function () {
             this.style.boxShadow = "0 0 0 #6d5210"
         });
+        this.leader_elem.children[1].addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.viewLeader();
+            return false;
+        }, false);
 
         this.faction = "realms";
         this.setFaction(this.faction, true);
@@ -5709,6 +5715,7 @@ class DeckMaker {
         this.start_op_deck;
         this.me_deck_index = 0;
         this.op_deck_index = 0;
+        this.op_leader_choice = "normal";
 
         this.change_elem = document.getElementById("change-faction");
         this.change_elem.addEventListener("click", () => this.selectFaction(), false);
@@ -5825,6 +5832,8 @@ if (toggleBtn) {
 
         document.getElementById("select-deck").addEventListener("click", () => this.selectDeck(), false);
         document.getElementById("select-op-deck").addEventListener("click", () => this.selectOPDeck(), false);
+        document.getElementById("select-op-leader").addEventListener("click", () => this.selectOPLeader(), false);
+        document.getElementById("op-leader-name").addEventListener("click", () => this.rerollOPLeader(), false);
         document.getElementById("download-deck").addEventListener("click", () => this.downloadDeck(), false);
         document.getElementById("add-file").addEventListener("change", () => this.uploadDeck(), false);
 document.getElementById("save-internal-deck").addEventListener("click", () => this.saveDeckInternal(), false);
@@ -6105,6 +6114,7 @@ makePreview(index, num, container_elem, cards) {
 
     // Opens a Carousel to allow the client to select a leader for their deck
     selectLeader() {
+        if (this.leader_elem && this.leader_elem.classList.contains("leader-locked")) return;
         let container = new CardContainer();
         container.cards = this.leaders.map(c => {
             let card = new Card(c.index, c.card, player_me);
@@ -6120,6 +6130,20 @@ makePreview(index, num, container_elem, cards) {
         }, () => true, false, true);
         Carousel.curr.index = index;
         Carousel.curr.update();
+    }
+
+    // View-only: opens a Carousel showing the current leader (and its ability)
+    // without allowing it to be changed. Used by the right-click handler when
+    // the leader is locked (Random Leader mode) so a player can still inspect
+    // the leader ability.
+    viewLeader() {
+        if (!this.leader || !this.leader.card) return;
+        let container = new CardContainer();
+        let card = new Card(this.leader.index, this.leader.card, player_me);
+        card.data = this.leader;
+        container.cards = [card];
+        ui.viewCardsInContainer(container);
+        if (Carousel.curr) { Carousel.curr.index = 0; Carousel.curr.update(); }
     }
 
        // Opens a Carousel to allow the client to select a faction for their deck
@@ -6333,6 +6357,57 @@ makePreview(index, num, container_elem, cards) {
         }, () => true, false, true);
         Carousel.curr.index = this.op_deck_index;
         Carousel.curr.update();
+    }
+
+    // Friend-mode only: lets a player choose how the opponent's leader is set.
+    // "Random Leader" locks the opponent's leader+faction to a seeded random
+    // pick (deterministic across both peers); "Normal" lets the opponent pick
+    // their leader+faction freely. Each player's choice applies to the OTHER
+    // player. Only the deck composition stays editable under Random Leader.
+    selectOPLeader() {
+        let container = new CardContainer();
+        container.cards = [
+            {
+                abilities: [],
+                name: "Normal",
+                row: "leader",
+                filename: "normal",
+                desc_name: "Normal",
+                desc: "<p>Opponent chooses their own leader and faction freely.</p>",
+                faction: "faction"
+            },
+            {
+                abilities: [],
+                name: "Random Leader",
+                row: "leader",
+                filename: "random",
+                desc_name: "Random Leader",
+                desc: "<p>Opponent's leader and faction are chosen at random (locked). Opponent may still build their deck freely.</p>",
+                faction: "faction"
+            }
+        ];
+        const cur = (this.op_leader_choice === "random") ? 1 : 0;
+        ui.queueCarousel(container, 1, (c, i) => {
+            this.op_leader_choice = (i === 1) ? "random" : "normal";
+            const opNameEl = document.getElementById("op-leader-name");
+            if (opNameEl) {
+                opNameEl.innerHTML = this.op_leader_choice === "random" ? "Random Leader" : "Normal";
+                opNameEl.classList.toggle("rerollable", this.op_leader_choice === "random");
+            }
+            if (window.GwentOnline && typeof window.GwentOnline.onOpLeaderChoice === "function")
+                window.GwentOnline.onOpLeaderChoice(this.op_leader_choice);
+        }, () => true, false, true);
+        Carousel.curr.index = cur;
+        Carousel.curr.update();
+    }
+
+    // Re-randomize the opponent's leader. Only active when this player has
+    // already chosen "Random Leader"; clicking the "Random Leader" text under
+    // Select Opponent Leader re-rolls the seeded random pick for the peer.
+    rerollOPLeader() {
+        if (this.op_leader_choice !== "random") return;
+        if (window.GwentOnline && typeof window.GwentOnline.rerollOpLeader === "function")
+            window.GwentOnline.rerollOpLeader();
     }
 
     // Called by the client to downlaod the current deck as a JSON file
@@ -7337,7 +7412,15 @@ document.onkeydown = function (e) {
 
 var elem_principal = document.documentElement;
 
+function autoFullscreenEnabled() {
+    try {
+        var v = localStorage.getItem("gwent-auto-fullscreen");
+        return v === null ? true : v === "true";
+    } catch (e) { return true; }
+}
+
 async function openFullscreen() {
+    if (!autoFullscreenEnabled()) return;
     try {
         if (elem_principal.requestFullscreen) elem_principal.requestFullscreen();
         else if (elem_principal.webkitRequestFullscreen) elem_principal.webkitRequestFullscreen();
@@ -7470,6 +7553,13 @@ var iniciou = false,
 var playingOnline;
 
 window.onload = function () {
+    var fsCheckbox = document.getElementById("auto-fullscreen-checkbox");
+    if (fsCheckbox) {
+        fsCheckbox.checked = autoFullscreenEnabled();
+        fsCheckbox.addEventListener("change", function () {
+            try { localStorage.setItem("gwent-auto-fullscreen", String(fsCheckbox.checked)); } catch (e) { }
+        });
+    }
     dimensionar();
     playingOnline = window.location.href == "https://randompianist.github.io/gwent-classic-v2.0/";
     document.getElementById("load_text").style.display = "none";
