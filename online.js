@@ -673,7 +673,10 @@ const GwentOnline = {
   onOpLeaderChoice(choice) {
     this.opLeaderChoice = (choice === "random") ? "random" : "normal";
     const el = document.getElementById("op-leader-name");
-    if (el) el.innerHTML = this.opLeaderChoice === "random" ? "Random Leader" : "Normal";
+    if (el) {
+      el.innerHTML = this.opLeaderChoice === "random" ? "Random Leader" : "Normal";
+      el.classList.toggle("rerollable", this.opLeaderChoice === "random");
+    }
     if (this.opLeaderChoice === "random") this.sendOpLeaderSeed();
     this.sendOpLeaderChoice();
   },
@@ -690,6 +693,14 @@ const GwentOnline = {
     }
     if (!OnlineNet.connected || !this.peerConnected) return;
     try { this.send({t:"lobby-opleader-seed", seed:this._outRandomLeaderSeed}); } catch (_) {}
+  },
+  // Re-randomize the opponent's leader: generate a fresh outgoing seed and
+  // resend it so the locked peer resolves a new random leader+deck. Triggered
+  // by clicking the "Random Leader" text under Select Opponent Leader.
+  rerollOpLeader() {
+    if (this.opLeaderChoice !== "random") return;
+    this._outRandomLeaderSeed = (Math.random() * 4294967296) >>> 0 || 1;
+    this.sendOpLeaderSeed();
   },
   // When the remote peer has chosen Random Leader for us, lock our own
   // leader+faction selectors (the deck composition stays editable). When
@@ -762,6 +773,9 @@ const GwentOnline = {
     }
     if (m.t === "lobby-opleader-seed") {
       this._inRandomLeaderSeed = m.seed >>> 0;
+      // A re-roll sends a new seed; allow it to apply even if a previous
+      // random leader was already resolved.
+      this._randomLeaderApplied = false;
       this.applyRandomLeaderForSelf();
       return;
     }

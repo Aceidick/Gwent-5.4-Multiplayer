@@ -1694,6 +1694,14 @@ font-weight: bold;
 	font-style: italic;
 }
 
+#op-leader-name.rerollable {
+	cursor: pointer;
+	text-decoration: underline;
+}
+#op-leader-name.rerollable:hover {
+	color: #e0b400;
+}
+
 #site-links {
     right: 5%;
     top: 5%;

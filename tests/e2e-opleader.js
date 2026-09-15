@@ -167,6 +167,40 @@ async function wait(page, fn, label, timeout=60000) {
   assert(hostDerived && hostAfter.faction===hostDerived.faction && hostAfter.leader===hostDerived.leader,
     'host resolved leader matches the guest outgoing seed (independent pick)');
 
+  // Re-roll: host clicks the "Random Leader" text under Select Opponent Leader
+  // to re-randomize the guest's leader. The host must generate a NEW outgoing
+  // seed (different from the first) and the guest must resolve a new leader+deck
+  // from that seed.
+  const opNameBefore = await A.evaluate(()=>document.getElementById('op-leader-name').textContent);
+  assert(opNameBefore==='Random Leader', 'host op-leader-name shows "Random Leader" (rerollable)');
+  const rerollableBefore = await A.evaluate(()=>document.getElementById('op-leader-name').classList.contains('rerollable'));
+  assert(rerollableBefore, 'host op-leader-name is marked rerollable');
+  const firstGuestLeader = guestAfter.leader;
+  await A.click('#op-leader-name');
+  // Host's outgoing seed must change.
+  const outSeed2 = await A.evaluate(()=>GwentOnline._outRandomLeaderSeed);
+  assert(outSeed2!==outSeed, 'host re-roll produces a new outgoing seed');
+  // Guest must resolve the new leader+deck from the new seed.
+  await wait(B,()=>{
+    const d=dm; return d && d.leader && d.leader.index && d.faction;
+  },'guest leader re-rolled');
+  const guestAfterReroll = await B.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index, cards:dm.deck.filter(x=>x.count>0).map(x=>[x.index,x.count])}));
+  assert(!!guestAfterReroll.leader, 'guest leader re-rolled (leader set)');
+  const guestRerollMatch = pool.find(p=>p.leader===guestAfterReroll.leader && p.faction===guestAfterReroll.faction);
+  assert(!!guestRerollMatch, 'guest re-rolled leader drawn from the full Select Own Deck pool');
+  assert(!!guestRerollMatch && cardsKey(guestRerollMatch.cards)===cardsKey(guestAfterReroll.cards),
+    'guest re-rolled deck composition matches the new premade deck');
+  // Determinism: guest's re-rolled leader must match the new seed.
+  const guestRerollDerived = await B.evaluate((args)=>{
+    const [seed, pool]=args; if (seed==null) return null;
+    let x=(seed>>>0)||1;
+    const next=()=>{x^=x<<13;x>>>=0;x^=x>>17;x^=x<<5;x>>>=0;return x;};
+    const pick=pool[next()%pool.length];
+    return pick;
+  }, [outSeed2, pool]);
+  assert(guestRerollDerived && guestAfterReroll.faction===guestRerollDerived.faction && guestAfterReroll.leader===guestRerollDerived.leader,
+    'guest re-rolled leader matches the new seed algorithm');
+
   // Unlock path: host switches back to "Normal" — guest must unlock.
   await A.click('#select-op-leader');
   await A.waitForFunction(()=>!!Carousel.curr,'host op-leader carousel open (normal)');
@@ -174,6 +208,8 @@ async function wait(page, fn, label, timeout=60000) {
   await A.evaluate(()=>{ if (Carousel.curr) Carousel.curr.select(new Event('click')); });
   await wait(B,()=>!document.getElementById('change-faction').classList.contains('noclick'),'guest faction unlocked after host Normal');
   await wait(B,()=>!document.getElementById('card-leader').classList.contains('noclick'),'guest leader unlocked after host Normal');
+  const rerollableAfterNormal = await A.evaluate(()=>document.getElementById('op-leader-name').classList.contains('rerollable'));
+  assert(!rerollableAfterNormal, 'host op-leader-name not rerollable after switching to Normal');
 
   // No page errors on either peer.
   assert(errs.A.length===0, 'host no page errors'+(errs.A.length?': '+errs.A.join(' | '):''));

@@ -5833,6 +5833,7 @@ if (toggleBtn) {
         document.getElementById("select-deck").addEventListener("click", () => this.selectDeck(), false);
         document.getElementById("select-op-deck").addEventListener("click", () => this.selectOPDeck(), false);
         document.getElementById("select-op-leader").addEventListener("click", () => this.selectOPLeader(), false);
+        document.getElementById("op-leader-name").addEventListener("click", () => this.rerollOPLeader(), false);
         document.getElementById("download-deck").addEventListener("click", () => this.downloadDeck(), false);
         document.getElementById("add-file").addEventListener("change", () => this.uploadDeck(), false);
 document.getElementById("save-internal-deck").addEventListener("click", () => this.saveDeckInternal(), false);
@@ -6388,12 +6389,25 @@ makePreview(index, num, container_elem, cards) {
         const cur = (this.op_leader_choice === "random") ? 1 : 0;
         ui.queueCarousel(container, 1, (c, i) => {
             this.op_leader_choice = (i === 1) ? "random" : "normal";
-            document.getElementById("op-leader-name").innerHTML = this.op_leader_choice === "random" ? "Random Leader" : "Normal";
+            const opNameEl = document.getElementById("op-leader-name");
+            if (opNameEl) {
+                opNameEl.innerHTML = this.op_leader_choice === "random" ? "Random Leader" : "Normal";
+                opNameEl.classList.toggle("rerollable", this.op_leader_choice === "random");
+            }
             if (window.GwentOnline && typeof window.GwentOnline.onOpLeaderChoice === "function")
                 window.GwentOnline.onOpLeaderChoice(this.op_leader_choice);
         }, () => true, false, true);
         Carousel.curr.index = cur;
         Carousel.curr.update();
+    }
+
+    // Re-randomize the opponent's leader. Only active when this player has
+    // already chosen "Random Leader"; clicking the "Random Leader" text under
+    // Select Opponent Leader re-rolls the seeded random pick for the peer.
+    rerollOPLeader() {
+        if (this.op_leader_choice !== "random") return;
+        if (window.GwentOnline && typeof window.GwentOnline.rerollOpLeader === "function")
+            window.GwentOnline.rerollOpLeader();
     }
 
     // Called by the client to downlaod the current deck as a JSON file
