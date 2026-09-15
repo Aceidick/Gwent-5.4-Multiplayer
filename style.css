@@ -2512,6 +2512,16 @@ color: #b48c44 !important;
 	pointer-events: none;
 }
 
+/* Random Leader lock: block left-click selection but keep right-click
+   (contextmenu) inspection of the leader ability working. */
+#card-leader.leader-locked {
+	opacity: 0.65;
+	cursor: not-allowed;
+}
+#card-leader.leader-locked > div {
+	cursor: context-menu;
+}
+
 /*
     DECK SORTER
 */

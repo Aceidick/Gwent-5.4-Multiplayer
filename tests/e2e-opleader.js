@@ -98,6 +98,25 @@ async function wait(page, fn, label, timeout=60000) {
   const hostLocked = await A.evaluate(()=>document.getElementById('change-faction').classList.contains('noclick'));
   assert(!hostLocked, 'host not locked by own choice');
 
+  // Right-click on the locked leader must still open a view-only carousel
+  // showing the leader ability (left-click selection stays blocked).
+  const guestLockedLeader = await B.evaluate(()=>document.getElementById('card-leader').classList.contains('leader-locked'));
+  assert(guestLockedLeader, 'guest leader marked leader-locked (no pointer-events:none)');
+  // Left-click must not open the select-leader carousel while locked.
+  const leftOpened = await B.evaluate(()=>{ try { dm.selectLeader(); return !!Carousel.curr; } catch(e){ return false; } });
+  assert(!leftOpened, 'guest selectLeader blocked while locked');
+  if (leftOpened) await B.evaluate(()=>{ try{Carousel.curr.cancel();}catch(e){} });
+  // Right-click (viewLeader) must open a view-only carousel with the leader.
+  await B.evaluate(()=>{ dm.viewLeader(); });
+  const viewOpened = await B.evaluate(()=>!!Carousel.curr);
+  assert(viewOpened, 'guest right-click opens view-only leader carousel');
+  if (viewOpened) {
+    const viewLeaderKey = await B.evaluate(()=>Carousel.curr && Carousel.curr.container && Carousel.curr.container.cards[0] && Carousel.curr.container.cards[0].key);
+    assert(viewLeaderKey===guestAfter.leader, 'view-only carousel shows the locked leader');
+    await B.evaluate(()=>{ try{Carousel.curr.cancel();}catch(e){} });
+    await wait(B,()=>!Carousel.curr,'guest view-only carousel closed');
+  }
+
   // Determinism check: re-derive the guest's leader from the host's outgoing
   // seed against the full premade leader pool and confirm it matches.
   const outSeed = await A.evaluate(()=>GwentOnline._outRandomLeaderSeed);

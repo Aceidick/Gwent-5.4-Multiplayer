@@ -699,7 +699,7 @@ const GwentOnline = {
     const changeFaction = document.getElementById("change-faction");
     if (changeFaction) changeFaction.classList.toggle("noclick", locked);
     const cardLeader = document.getElementById("card-leader");
-    if (cardLeader) cardLeader.classList.toggle("noclick", locked);
+    if (cardLeader) cardLeader.classList.toggle("leader-locked", locked);
     const selectDeck = document.getElementById("select-deck");
     if (selectDeck) selectDeck.classList.toggle("noclick", locked);
     if (locked) this.applyRandomLeaderForSelf();
@@ -714,7 +714,7 @@ const GwentOnline = {
     const changeFaction = document.getElementById("change-faction");
     if (changeFaction) changeFaction.classList.toggle("noclick", locked);
     const cardLeader = document.getElementById("card-leader");
-    if (cardLeader) cardLeader.classList.toggle("noclick", locked);
+    if (cardLeader) cardLeader.classList.toggle("leader-locked", locked);
     const selectDeck = document.getElementById("select-deck");
     if (selectDeck) selectDeck.classList.toggle("noclick", locked);
   },

@@ -5693,6 +5693,12 @@ class DeckMaker {
         this.leader_elem.children[1].addEventListener("mouseout", function () {
             this.style.boxShadow = "0 0 0 #6d5210"
         });
+        this.leader_elem.children[1].addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.viewLeader();
+            return false;
+        }, false);
 
         this.faction = "realms";
         this.setFaction(this.faction, true);
@@ -6107,6 +6113,7 @@ makePreview(index, num, container_elem, cards) {
 
     // Opens a Carousel to allow the client to select a leader for their deck
     selectLeader() {
+        if (this.leader_elem && this.leader_elem.classList.contains("leader-locked")) return;
         let container = new CardContainer();
         container.cards = this.leaders.map(c => {
             let card = new Card(c.index, c.card, player_me);
@@ -6122,6 +6129,20 @@ makePreview(index, num, container_elem, cards) {
         }, () => true, false, true);
         Carousel.curr.index = index;
         Carousel.curr.update();
+    }
+
+    // View-only: opens a Carousel showing the current leader (and its ability)
+    // without allowing it to be changed. Used by the right-click handler when
+    // the leader is locked (Random Leader mode) so a player can still inspect
+    // the leader ability.
+    viewLeader() {
+        if (!this.leader || !this.leader.card) return;
+        let container = new CardContainer();
+        let card = new Card(this.leader.index, this.leader.card, player_me);
+        card.data = this.leader;
+        container.cards = [card];
+        ui.viewCardsInContainer(container);
+        if (Carousel.curr) { Carousel.curr.index = 0; Carousel.curr.update(); }
     }
 
        // Opens a Carousel to allow the client to select a faction for their deck
