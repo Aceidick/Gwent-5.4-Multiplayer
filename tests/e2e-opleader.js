@@ -63,11 +63,12 @@ async function wait(page, fn, label, timeout=60000) {
   const hostBefore = await A.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index}));
   const guestBefore = await B.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index}));
 
-  // The full "Select Own Deck" leader pool: one entry per premade deck.
+  // The full "Select Own Deck" pool: one entry per premade deck (leader+faction+cards).
   const pool = await A.evaluate(()=>Object.values(premade_deck)
-    .map(d=>({faction:d.faction, leader:d.leader}))
+    .map(d=>({faction:d.faction, leader:d.leader, cards:d.cards}))
     .filter(p=>p.leader&&card_dict[p.leader]&&card_dict[p.leader].row==='leader'));
-  assert(pool.length>20, `Select Own Deck leader pool size>20 (got ${pool.length})`);
+  assert(pool.length>20, `Select Own Deck pool size>20 (got ${pool.length})`);
+  const cardsKey = cards => (cards||[]).map(c=>[c[0],c[1]].join(':')).sort().join('|');
 
   // Host chooses "Random Leader" for the guest (asymmetric: only host picks).
   await A.click('#select-op-leader');
@@ -85,11 +86,13 @@ async function wait(page, fn, label, timeout=60000) {
   await wait(B,()=>{
     const d=dm; return d && d.leader && d.leader.index && d.faction;
   },'guest random leader resolved');
-  const guestAfter = await B.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index}));
+  const guestAfter = await B.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index, cards:dm.deck.filter(x=>x.count>0).map(x=>[x.index,x.count])}));
 
   assert(!!guestAfter.faction && !!guestAfter.leader, 'guest random leader resolved (faction+leader set)');
-  assert(pool.some(p=>p.leader===guestAfter.leader && p.faction===guestAfter.faction),
-    'guest leader drawn from the full Select Own Deck pool');
+  const guestMatch = pool.find(p=>p.leader===guestAfter.leader && p.faction===guestAfter.faction);
+  assert(!!guestMatch, 'guest leader+faction drawn from the full Select Own Deck pool');
+  assert(!!guestMatch && cardsKey(guestMatch.cards)===cardsKey(guestAfter.cards),
+    'guest deck composition matches the picked premade deck (full deck loaded)');
 
   // Host must NOT be locked by its own choice (asymmetric: only peer is locked).
   const hostLocked = await A.evaluate(()=>document.getElementById('change-faction').classList.contains('noclick'));
@@ -121,10 +124,12 @@ async function wait(page, fn, label, timeout=60000) {
     const d=dm; return d && d.leader && d.leader.index && d.faction;
   },'host random leader resolved');
 
-  const hostAfter = await A.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index}));
+  const hostAfter = await A.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index, cards:dm.deck.filter(x=>x.count>0).map(x=>[x.index,x.count])}));
   assert(!!hostAfter.faction && !!hostAfter.leader, 'host random leader resolved (faction+leader set)');
-  assert(pool.some(p=>p.leader===hostAfter.leader && p.faction===hostAfter.faction),
-    'host leader drawn from the full Select Own Deck pool');
+  const hostMatch = pool.find(p=>p.leader===hostAfter.leader && p.faction===hostAfter.faction);
+  assert(!!hostMatch, 'host leader+faction drawn from the full Select Own Deck pool');
+  assert(!!hostMatch && cardsKey(hostMatch.cards)===cardsKey(hostAfter.cards),
+    'host deck composition matches the picked premade deck (full deck loaded)');
 
   // The two picks are INDEPENDENT: the host's outgoing seed (for the guest)
   // differs from the guest's outgoing seed (for the host), so the two resolved

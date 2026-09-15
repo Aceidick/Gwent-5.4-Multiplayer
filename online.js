@@ -727,26 +727,23 @@ const GwentOnline = {
     this._randomLeaderApplied = true;
     this._applyRandomLeaderSeed(this._inRandomLeaderSeed);
   },
-  // Pick a random leader from the full "Select Own Deck" leader pool: every
-  // premade deck's leader across all factions. The faction follows the picked
-  // leader's deck so the deck composition stays legal after the swap. Each peer
-  // resolves from its own incoming seed, so the two picks are independent.
+  // Pick a random leader+deck from the full "Select Own Deck" pool: every
+  // premade deck across all factions. This mirrors selecting a deck manually
+  // under "Select Own Deck" (setFaction + deckFromJSON), so the whole deck
+  // composition follows the picked leader. Each peer resolves from its own
+  // incoming seed, so the two picks are independent.
   _applyRandomLeaderSeed(seed) {
     if (!dm || typeof premade_deck === "undefined" || typeof card_dict === "undefined" || typeof factions === "undefined") return;
     const pool = Object.values(premade_deck)
-      .map(d => ({ faction: d.faction, leader: d.leader }))
-      .filter(p => p.leader && card_dict[p.leader] && card_dict[p.leader].row === "leader");
+      .filter(d => d.leader && card_dict[d.leader] && card_dict[d.leader].row === "leader");
     if (!pool.length) return;
     const s = (seed >>> 0) || 1;
     let x = s;
     const next = () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x; };
-    const pick = pool[next() % pool.length];
-    const faction = pick.faction;
-    const leader = pick.leader;
-    dm.setFaction(faction, true);
-    dm.leader = { index: leader, card: card_dict[leader] };
+    const deck = pool[next() % pool.length];
+    dm.deckFromJSON(deck, false);
     if (dm.leader_elem && dm.leader_elem.children[1]) getPreviewElem(dm.leader_elem.children[1], dm.leader.card);
-    this.updateLobby("Opponent chose Random Leader — your leader+faction locked.", OnlineNet.code);
+    this.updateLobby("Opponent chose Random Leader — your leader+deck locked.", OnlineNet.code);
   },
   routeLobby(m) {
     if (m.t === "lobby-ready") { this.remoteDeck = m.deck; this.remoteReady = this.validateDeckRaw(m.deck); this.updateReadyUI(); this.updateDeckStartButton(); this.updateRematchUI(); return this.maybeStartAsHost(); }
