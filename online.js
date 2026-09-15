@@ -726,18 +726,21 @@ const GwentOnline = {
   },
   _applyRandomLeaderSeed(seed) {
     if (!dm || typeof premade_deck === "undefined" || typeof card_dict === "undefined") return;
-    const factionKeys = Object.keys(factions);
+    // Pick a random leader from the locked player's OWN faction leader
+    // options (the same leaders presented by "Select Own Deck" for that
+    // faction). The faction and deck stay as the player built them; only the
+    // leader is randomized, so the deck composition stays legal.
+    const leaders = (dm.leaders && dm.leaders.length)
+      ? dm.leaders
+      : Object.keys(card_dict).filter(k => card_dict[k].deck === dm.faction && card_dict[k].row === "leader").map(k => ({ index: k, card: card_dict[k] }));
+    if (!leaders.length) return;
     const s = (seed >>> 0) || 1;
     let x = s;
     const next = () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x; };
-    const faction = factionKeys[next() % factionKeys.length];
-    const leaders = Object.keys(card_dict).filter(k => card_dict[k].deck === faction && card_dict[k].row === "leader");
-    if (!leaders.length) return;
-    const leader = leaders[next() % leaders.length];
-    dm.setFaction(faction, true);
-    dm.leader = { index: leader, card: card_dict[leader] };
+    const pick = leaders[next() % leaders.length];
+    dm.leader = { index: pick.index, card: pick.card };
     if (dm.leader_elem && dm.leader_elem.children[1]) getPreviewElem(dm.leader_elem.children[1], dm.leader.card);
-    this.updateLobby("Opponent chose Random Leader — your leader/faction locked.", OnlineNet.code);
+    this.updateLobby("Opponent chose Random Leader — your leader is locked.", OnlineNet.code);
   },
   routeLobby(m) {
     if (m.t === "lobby-ready") { this.remoteDeck = m.deck; this.remoteReady = this.validateDeckRaw(m.deck); this.updateReadyUI(); this.updateDeckStartButton(); this.updateRematchUI(); return this.maybeStartAsHost(); }

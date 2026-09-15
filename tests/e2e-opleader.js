@@ -89,26 +89,28 @@ async function wait(page, fn, label, timeout=60000) {
   const hostLocked = await A.evaluate(()=>document.getElementById('change-faction').classList.contains('noclick'));
   assert(!hostLocked, 'host not locked by own choice');
 
-  // Determinism check: re-derive the host's own seed locally and confirm the
-  // guest's resolved faction/leader match the xorshift(seed) algorithm, so the
-  // two peers would start a match on the same leader.
+  // The guest's faction must be unchanged (only its leader is randomized).
+  assert(guestAfter.faction===guestBefore.faction, 'guest faction preserved under Random Leader');
+
+  // Determinism check: re-derive the leader from the host's seed against the
+  // guest's own faction leader list (the same list dm.leaders exposes) and
+  // confirm the guest's resolved leader matches the deterministic algorithm.
   const seedMatch = await A.evaluate(async ()=>{
-    // Host keeps the seed it sent in _randomLeaderSeed.
     return GwentOnline._randomLeaderSeed;
   });
   const guestDerived = await B.evaluate((seed)=>{
     if (seed==null) return null;
-    const factionKeys=Object.keys(factions);
+    const leaders=(dm.leaders&&dm.leaders.length)?dm.leaders:
+      Object.keys(card_dict).filter(k=>card_dict[k].deck===dm.faction&&card_dict[k].row==='leader')
+        .map(k=>({index:k,card:card_dict[k]}));
     let x=(seed>>>0)||1;
     const next=()=>{x^=x<<13;x>>>=0;x^=x>>17;x^=x<<5;x>>>=0;return x;};
-    const faction=factionKeys[next()%factionKeys.length];
-    const leaders=Object.keys(card_dict).filter(k=>card_dict[k].deck===faction&&card_dict[k].row==='leader');
-    const leader=leaders[next()%leaders.length];
-    return {faction, leader};
+    const pick=leaders[next()%leaders.length];
+    return {leader: pick.index || pick};
   }, seedMatch);
   assert(!!guestDerived, 'guest derived leader from host seed');
-  assert(guestDerived && guestAfter.faction===guestDerived.faction && guestAfter.leader===guestDerived.leader,
-    'guest resolved leader matches deterministic seed algorithm');
+  assert(guestDerived && guestAfter.leader===guestDerived.leader,
+    'guest resolved leader matches deterministic seed algorithm (own faction leaders)');
 
   // Symmetric lock: guest now also picks "Random Leader" for the host.
   await B.click('#select-op-leader');
