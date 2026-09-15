@@ -668,15 +668,25 @@ const GwentOnline = {
   },
   // The opponent-leader choice this player makes for the OTHER player. Each
   // player's choice is independent and asymmetric: it only locks the peer.
+  // The player who picks "Random Leader" owns the RNG seed and sends it; the
+  // locked peer waits for that seed so both peers resolve the same leader.
   onOpLeaderChoice(choice) {
     this.opLeaderChoice = (choice === "random") ? "random" : "normal";
     const el = document.getElementById("op-leader-name");
     if (el) el.innerHTML = this.opLeaderChoice === "random" ? "Random Leader" : "Normal";
+    if (this.opLeaderChoice === "random") this.sendOpLeaderSeed();
     this.sendOpLeaderChoice();
   },
   sendOpLeaderChoice() {
     if (!OnlineNet.connected || !this.peerConnected) return;
     try { this.send({t:"lobby-opleader", choice:this.opLeaderChoice}); } catch (_) {}
+  },
+  sendOpLeaderSeed() {
+    if (this._randomLeaderSeed == null) {
+      this._randomLeaderSeed = (Math.random() * 4294967296) >>> 0 || 1;
+    }
+    if (!OnlineNet.connected || !this.peerConnected) return;
+    try { this.send({t:"lobby-opleader-seed", seed:this._randomLeaderSeed}); } catch (_) {}
   },
   // When the remote peer has chosen Random Leader for us, lock our own
   // leader+faction selectors (the deck composition stays editable). When
@@ -690,7 +700,11 @@ const GwentOnline = {
     const selectDeck = document.getElementById("select-deck");
     if (selectDeck) selectDeck.classList.toggle("noclick", locked);
     if (locked) this.applyRandomLeaderForSelf();
-    else if (this.remoteOpLeaderChoice === "normal") this.updateLobby("Opponent lets you pick your leader/faction freely.", OnlineNet.code);
+    else {
+      this._randomLeaderApplied = false;
+      this._randomLeaderSeed = null;
+      if (this.remoteOpLeaderChoice === "normal") this.updateLobby("Opponent lets you pick your leader/faction freely.", OnlineNet.code);
+    }
   },
   clearOpLeaderLock() {
     const locked = false;
@@ -701,21 +715,14 @@ const GwentOnline = {
     const selectDeck = document.getElementById("select-deck");
     if (selectDeck) selectDeck.classList.toggle("noclick", locked);
   },
-  // Seeded random leader+faction for ourselves, deterministic across both
-  // peers. The host derives a faction+leader seed and sends it; the guest
-  // waits for the seed so both sides pick the identical leader.
+  // Apply the remote peer's Random Leader lock locally. The peer who chose
+  // Random Leader already sent a lobby-opleader-seed; if it has arrived, apply
+  // it now, otherwise wait for routeLobby to apply it on arrival.
   applyRandomLeaderForSelf() {
     if (this._randomLeaderApplied) return;
+    if (this._randomLeaderSeed == null) return;
     this._randomLeaderApplied = true;
-    if (this.role === "host" || this.role === "guest") {
-      if (this.role === "host") {
-        const seed = (this.deckRng.host?._state >>> 0) || (Date.now() >>> 0);
-        this._randomLeaderSeed = seed;
-        this.send({t:"lobby-opleader-seed", seed});
-        this._applyRandomLeaderSeed(seed);
-      }
-      // guest applies the seed on receiving lobby-opleader-seed (handled in routeLobby)
-    }
+    this._applyRandomLeaderSeed(this._randomLeaderSeed);
   },
   _applyRandomLeaderSeed(seed) {
     if (!dm || typeof premade_deck === "undefined" || typeof card_dict === "undefined") return;
@@ -747,9 +754,9 @@ const GwentOnline = {
       this.applyRemoteOpLeaderLock();
       return;
     }
-    if (m.t === "lobby-opleader-seed" && this.role === "guest") {
+    if (m.t === "lobby-opleader-seed") {
       this._randomLeaderSeed = m.seed >>> 0;
-      this._applyRandomLeaderSeed(m.seed >>> 0);
+      this.applyRandomLeaderForSelf();
       return;
     }
     if (m.t === "lobby-start") {
