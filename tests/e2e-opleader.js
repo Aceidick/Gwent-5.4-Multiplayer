@@ -63,6 +63,12 @@ async function wait(page, fn, label, timeout=60000) {
   const hostBefore = await A.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index}));
   const guestBefore = await B.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index}));
 
+  // The full "Select Own Deck" leader pool: one entry per premade deck.
+  const pool = await A.evaluate(()=>Object.values(premade_deck)
+    .map(d=>({faction:d.faction, leader:d.leader}))
+    .filter(p=>p.leader&&card_dict[p.leader]&&card_dict[p.leader].row==='leader'));
+  assert(pool.length>20, `Select Own Deck leader pool size>20 (got ${pool.length})`);
+
   // Host chooses "Random Leader" for the guest (asymmetric: only host picks).
   await A.click('#select-op-leader');
   await A.waitForFunction(()=>!!Carousel.curr,'host op-leader carousel open');
@@ -75,42 +81,33 @@ async function wait(page, fn, label, timeout=60000) {
   await wait(B,()=>document.getElementById('card-leader').classList.contains('noclick'),'guest leader locked');
   await wait(B,()=>document.getElementById('select-deck').classList.contains('noclick'),'guest deck-select locked');
 
-  // The guest must now have a (seeded) random leader applied.
+  // The guest must now have a (seeded) random leader applied from the full pool.
   await wait(B,()=>{
     const d=dm; return d && d.leader && d.leader.index && d.faction;
   },'guest random leader resolved');
   const guestAfter = await B.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index}));
 
   assert(!!guestAfter.faction && !!guestAfter.leader, 'guest random leader resolved (faction+leader set)');
-  assert(!(guestAfter.faction===guestBefore.faction && guestAfter.leader===guestBefore.leader) || true,
-    'guest leader may differ from default (random pick allowed to coincide)');
+  assert(pool.some(p=>p.leader===guestAfter.leader && p.faction===guestAfter.faction),
+    'guest leader drawn from the full Select Own Deck pool');
 
   // Host must NOT be locked by its own choice (asymmetric: only peer is locked).
   const hostLocked = await A.evaluate(()=>document.getElementById('change-faction').classList.contains('noclick'));
   assert(!hostLocked, 'host not locked by own choice');
 
-  // The guest's faction must be unchanged (only its leader is randomized).
-  assert(guestAfter.faction===guestBefore.faction, 'guest faction preserved under Random Leader');
-
-  // Determinism check: re-derive the leader from the host's seed against the
-  // guest's own faction leader list (the same list dm.leaders exposes) and
-  // confirm the guest's resolved leader matches the deterministic algorithm.
-  const seedMatch = await A.evaluate(async ()=>{
-    return GwentOnline._randomLeaderSeed;
-  });
-  const guestDerived = await B.evaluate((seed)=>{
-    if (seed==null) return null;
-    const leaders=(dm.leaders&&dm.leaders.length)?dm.leaders:
-      Object.keys(card_dict).filter(k=>card_dict[k].deck===dm.faction&&card_dict[k].row==='leader')
-        .map(k=>({index:k,card:card_dict[k]}));
+  // Determinism check: re-derive the guest's leader from the host's outgoing
+  // seed against the full premade leader pool and confirm it matches.
+  const outSeed = await A.evaluate(()=>GwentOnline._outRandomLeaderSeed);
+  const guestDerived = await B.evaluate((args)=>{
+    const [seed, pool]=args; if (seed==null) return null;
     let x=(seed>>>0)||1;
     const next=()=>{x^=x<<13;x>>>=0;x^=x>>17;x^=x<<5;x>>>=0;return x;};
-    const pick=leaders[next()%leaders.length];
-    return {leader: pick.index || pick};
-  }, seedMatch);
+    const pick=pool[next()%pool.length];
+    return pick;
+  }, [outSeed, pool]);
   assert(!!guestDerived, 'guest derived leader from host seed');
-  assert(guestDerived && guestAfter.leader===guestDerived.leader,
-    'guest resolved leader matches deterministic seed algorithm (own faction leaders)');
+  assert(guestDerived && guestAfter.faction===guestDerived.faction && guestAfter.leader===guestDerived.leader,
+    'guest resolved leader matches deterministic seed algorithm (full pool)');
 
   // Symmetric lock: guest now also picks "Random Leader" for the host.
   await B.click('#select-op-leader');
@@ -126,6 +123,25 @@ async function wait(page, fn, label, timeout=60000) {
 
   const hostAfter = await A.evaluate(()=>({faction:dm.faction, leader:dm.leader?.index}));
   assert(!!hostAfter.faction && !!hostAfter.leader, 'host random leader resolved (faction+leader set)');
+  assert(pool.some(p=>p.leader===hostAfter.leader && p.faction===hostAfter.faction),
+    'host leader drawn from the full Select Own Deck pool');
+
+  // The two picks are INDEPENDENT: the host's outgoing seed (for the guest)
+  // differs from the guest's outgoing seed (for the host), so the two resolved
+  // leaders come from independent RNG streams and may differ.
+  const guestOutSeed = await B.evaluate(()=>GwentOnline._outRandomLeaderSeed);
+  assert(outSeed!==guestOutSeed, 'host and guest outgoing seeds are independent');
+  // Confirm the host's resolved leader matches the guest's outgoing seed
+  // against the full pool, proving each peer uses its own incoming seed.
+  const hostDerived = await A.evaluate((args)=>{
+    const [seed, pool]=args; if (seed==null) return null;
+    let x=(seed>>>0)||1;
+    const next=()=>{x^=x<<13;x>>>=0;x^=x>>17;x^=x<<5;x>>>=0;return x;};
+    const pick=pool[next()%pool.length];
+    return pick;
+  }, [guestOutSeed, pool]);
+  assert(hostDerived && hostAfter.faction===hostDerived.faction && hostAfter.leader===hostDerived.leader,
+    'host resolved leader matches the guest outgoing seed (independent pick)');
 
   // Unlock path: host switches back to "Normal" — guest must unlock.
   await A.click('#select-op-leader');
