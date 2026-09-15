@@ -2305,10 +2305,6 @@ const GwentOnline = {
     const friend = mode === "friend";
     const onlineButton = document.getElementById("start-pvp-game");
     if (onlineButton) onlineButton.style.display = friend ? "" : "none";
-    const opLeaderBtn = document.getElementById("select-op-leader");
-    const opLeaderName = document.getElementById("op-leader-name");
-    if (opLeaderBtn) opLeaderBtn.style.display = friend ? "" : "none";
-    if (opLeaderName) opLeaderName.style.display = friend ? "" : "none";
     const lobby = document.getElementById("online-lobby");
     if (!friend && lobby) lobby.classList.add("hide");
     this.updateDeckStartButton();

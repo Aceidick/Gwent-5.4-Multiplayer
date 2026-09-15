@@ -1683,6 +1683,17 @@ font-weight: bold;
 	font-style: italic;
 }
 
+#select-op-leader {
+	left: 56%;
+}
+
+#op-leader-name {
+	left: 56%;
+	top: 16.9%;
+	color: #cccccc;
+	font-style: italic;
+}
+
 #site-links {
     right: 5%;
     top: 5%;
@@ -2890,6 +2901,8 @@ body[data-play-mode="computer"] #start-pvp-game { display: none !important; }
 body[data-play-mode="friend"] #start-pvp-game { display: block; }
 body[data-play-mode="friend"] #select-op-deck,
 body[data-play-mode="friend"] #op-deck-name { display: none !important; }
+body[data-play-mode="computer"] #select-op-leader,
+body[data-play-mode="computer"] #op-leader-name { display: none !important; }
 
 /* Keep the two Friend-mode actions visually together after removing legacy AI/hotseat buttons. */
 body[data-play-mode="friend"] #start-pvp-game { top: 90.5%; left: 44.9%; }
