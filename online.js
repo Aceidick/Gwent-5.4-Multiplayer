@@ -798,6 +798,16 @@ const GwentOnline = {
     const prevOwner = this._decisionOwner;
     const prevContext = this._effectContext;
     const prevEffectDecisionSerial = this._effectDecisionSerial;
+    // Scope the RNG to the effect owner so each player's delayed effects
+    // (roundStart/roundEnd/turnStart/turnEnd) consume an independent RNG
+    // stream. The shared gameRng would otherwise diverge when asynchronous
+    // effect bodies (notifications, animations) interleave differently on
+    // the two peers, causing randomized effects such as Skellige's round-3
+    // graveyard revive to select different cards and desync at the round-phase
+    // barrier. deckRng is already per-role and seed-stable across browsers.
+    const prevRngScope = this.rngScope;
+    const ownerRole = player ? this.roleOfPlayer(player) : null;
+    if (ownerRole) this.rngScope = ownerRole;
     this._decisionOwner = player || prevOwner || null;
     // Decision ids inside a delayed/owned effect must be deterministic on both
     // peers. A match-global serial is unsafe because local-only UI interactions
@@ -815,6 +825,7 @@ const GwentOnline = {
         this._decisionOwner = prevOwner;
         this._effectContext = prevContext;
         this._effectDecisionSerial = prevEffectDecisionSerial;
+        this.rngScope = prevRngScope;
       }
     }
   },
@@ -1794,6 +1805,24 @@ const GwentOnline = {
       if (self.active && !self._sendingSuppressed && this === player_me && game.currPlayer === player_me) self.send({t:"action", a:"pass", preState:self.zoneSnapshot(player_me)});
       return oldPass.call(this);
     };
+    // v1.4.x: replaceLeader (used by Wild Hunt's round-start leader swap and
+    // some ability continuations) runs the new leader's placed() handler, which
+    // may push delayed lifecycle hooks (turnEnd/turnStart/...) onto the game
+    // arrays. Those hooks must be wrapped in the owner's decision context,
+    // exactly like the initial leader init at startGame, otherwise they run
+    // with a null effect context. A null context makes their interactive
+    // popups use the match-global decision serial, which diverges between the
+    // two peers and eventually times out as "Timed out waiting for popup
+    // choice (...:turn:popup:N)".
+    const oldReplaceLeader = Player.prototype.replaceLeader;
+    Player.prototype.replaceLeader = function(newLeader) {
+      if (!self.active) return oldReplaceLeader.call(this, newLeader);
+      const hookNames = ['gameStart','roundStart','roundEnd','turnStart','turnEnd','unitDestroyed'];
+      const before = Object.fromEntries(hookNames.map(n => [n, Array.isArray(game?.[n]) ? game[n].length : 0]));
+      const r = oldReplaceLeader.call(this, newLeader);
+      self.bindNewGameHooks(this, before, `leader:${newLeader?.key || 'unknown'}:placed`);
+      return r;
+    };
     const oldLeader = Player.prototype.activateLeader;
     Player.prototype.activateLeader = async function(...args) {
       if (self.active && args[0] !== false && !self._sendingSuppressed && this === player_me && game.currPlayer === player_me) self.send({t:"action", a:"leader", preState:self.zoneSnapshot(player_me)});
@@ -1804,7 +1833,16 @@ const GwentOnline = {
     Player.prototype.activateFactionAbility = async function(...args) {
       if (!self.active) return oldActivateFaction.apply(this, args);
       return self.withDecisionOwner(this, async () => {
-        if (this === player_me) self._suppressPopupWire = true;
+        // The "Use faction ability?" confirm popup is a local-only UI prompt;
+        // it never carries a gameplay choice to replay on the peer. Always
+        // suppress the synced popup-wire for it (regardless of which player
+        // object triggers it) so it can never open a beginDecision that the
+        // remote peer has no matching decision for and time out. The actual
+        // faction ability runs through useFactionAbility(), whose own
+        // withDecisionOwner scope ("faction:...:use") and any inner popups
+        // remain fully synced because the suppress flag is consumed by the
+        // confirm popup before the ability body runs.
+        self._suppressPopupWire = true;
         try { return await oldActivateFaction.apply(this, args); } finally { self._suppressPopupWire = false; }
       }, `faction:${this.deck?.faction || 'unknown'}:activate`);
     };
