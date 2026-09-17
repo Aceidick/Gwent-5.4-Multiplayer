@@ -3078,18 +3078,18 @@ tocar("coin", false);
                 if (player_me.leader.key === "sc_francesca_daisy") {
                     await ui.queueCarousel(player_me.hand, myCount, async (c, i) => player_me.deck.addCard(c.removeCard(i)), c => true, true, false, "Player 1 - Choose " + myCount +" cards to put back to deck.", true);
                 } else {
-                    await ui.queueCarousel(player_me.hand, myCount, async (c, i) => await player_me.deck.swap(c, c.removeCard(i)), c => true, true, true, "Player 1 - Choose up to " + myCount +" cards to redraw.");
+                    await ui.queueCarousel(player_me.hand, myCount, async (c, i) => await player_me.deck.swap(c, c.removeCard(i)), c => true, true, true, "Player 1 - Choose up to " + myCount +" cards to redraw.", true);
                 }
                 if (player_op.leader.key === "sc_francesca_daisy") {
                     await ui.queueCarousel(player_op.hand, opCount, async (c, i) => player_op.deck.addCard(c.removeCard(i)), c => true, true, false, "Player 2 - Choose " + opCount +" cards to put back to deck.", true);
                 } else {
-                    await ui.queueCarousel(player_op.hand, opCount, async (c, i) => await player_op.deck.swap(c, c.removeCard(i)), c => true, true, true, "Player 2 - Choose up to " + opCount +" cards to redraw.");
+                    await ui.queueCarousel(player_op.hand, opCount, async (c, i) => await player_op.deck.swap(c, c.removeCard(i)), c => true, true, true, "Player 2 - Choose up to " + opCount +" cards to redraw.", true);
                 }
             } else {
                 if (player_me.leader.key === "sc_francesca_daisy") {
                     await ui.queueCarousel(player_me.hand, myCount, async (c, i) => player_me.deck.addCard(c.removeCard(i)), c => true, true, false, "Choose " + myCount +" cards to put back to deck.", true);
                 } else {
-                    await ui.queueCarousel(player_me.hand, myCount, async (c, i) => await player_me.deck.swap(c, c.removeCard(i)), c => true, true, true, "Choose up to " + myCount +" cards to redraw.");
+                    await ui.queueCarousel(player_me.hand, myCount, async (c, i) => await player_me.deck.swap(c, c.removeCard(i)), c => true, true, true, "Choose up to " + myCount +" cards to redraw.", true);
                 }
             }
             ui.enablePlayer(false);
