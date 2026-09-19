@@ -77,6 +77,8 @@ const GwentOnline = {
   localReady: false,
   remoteReady: false,
   peerConnected: false,
+  opLeaderChoice: "normal",
+  remoteOpLeaderChoice: null,
   _decisionOwner: null,
   _effectContext: null,
   _decisionSerial: 0,
@@ -620,6 +622,7 @@ const GwentOnline = {
     // lobby Ready button can remain disabled until the host sends lobby-ready.
     this.updateReadyUI();
     this.updateDeckStartButton();
+    this.sendOpLeaderChoice();
   },
   async quickMatch() {
     this.updateLobby("Connecting to multiplayer server…");
@@ -640,6 +643,7 @@ const GwentOnline = {
       this.updateLobby("Opponent joined. Both players can now press Start game.", OnlineNet.code);
       this.updateReadyUI();
       this.updateDeckStartButton();
+      this.sendOpLeaderChoice();
     };
     OnlineNet.onPeerLeft = () => this.peerLeft();
     await OnlineNet.connect();
@@ -662,6 +666,96 @@ const GwentOnline = {
     this.updateReadyUI();
     this.updateRematchUI();
   },
+  // The opponent-leader choice this player makes for the OTHER player. Each
+  // player's choice is independent and asymmetric: it only locks the peer.
+  // The player who picks "Random Leader" owns the RNG seed and sends it; the
+  // locked peer waits for that seed so both peers resolve the same leader.
+  onOpLeaderChoice(choice) {
+    this.opLeaderChoice = (choice === "random") ? "random" : "normal";
+    const el = document.getElementById("op-leader-name");
+    if (el) {
+      el.innerHTML = this.opLeaderChoice === "random" ? "Random Leader" : "Normal";
+      el.classList.toggle("rerollable", this.opLeaderChoice === "random");
+    }
+    if (this.opLeaderChoice === "random") this.sendOpLeaderSeed();
+    this.sendOpLeaderChoice();
+  },
+  sendOpLeaderChoice() {
+    if (!OnlineNet.connected || !this.peerConnected) return;
+    try { this.send({t:"lobby-opleader", choice:this.opLeaderChoice}); } catch (_) {}
+  },
+  // Outgoing seed: this peer's own RNG for locking the OTHER player. Kept
+  // separate from the incoming seed (the one we received from the peer for
+  // ourselves) so the two independent random picks never collide.
+  sendOpLeaderSeed() {
+    if (this._outRandomLeaderSeed == null) {
+      this._outRandomLeaderSeed = (Math.random() * 4294967296) >>> 0 || 1;
+    }
+    if (!OnlineNet.connected || !this.peerConnected) return;
+    try { this.send({t:"lobby-opleader-seed", seed:this._outRandomLeaderSeed}); } catch (_) {}
+  },
+  // Re-randomize the opponent's leader: generate a fresh outgoing seed and
+  // resend it so the locked peer resolves a new random leader+deck. Triggered
+  // by clicking the "Random Leader" text under Select Opponent Leader.
+  rerollOpLeader() {
+    if (this.opLeaderChoice !== "random") return;
+    this._outRandomLeaderSeed = (Math.random() * 4294967296) >>> 0 || 1;
+    this.sendOpLeaderSeed();
+  },
+  // When the remote peer has chosen Random Leader for us, lock our own
+  // leader+faction selectors (the deck composition stays editable). When
+  // Normal or unknown, unlock them so we can choose freely.
+  applyRemoteOpLeaderLock() {
+    const locked = this.remoteOpLeaderChoice === "random";
+    const changeFaction = document.getElementById("change-faction");
+    if (changeFaction) changeFaction.classList.toggle("noclick", locked);
+    const cardLeader = document.getElementById("card-leader");
+    if (cardLeader) cardLeader.classList.toggle("leader-locked", locked);
+    const selectDeck = document.getElementById("select-deck");
+    if (selectDeck) selectDeck.classList.toggle("noclick", locked);
+    if (locked) this.applyRandomLeaderForSelf();
+    else {
+      this._randomLeaderApplied = false;
+      this._inRandomLeaderSeed = null;
+      if (this.remoteOpLeaderChoice === "normal") this.updateLobby("Opponent lets you pick your leader/faction freely.", OnlineNet.code);
+    }
+  },
+  clearOpLeaderLock() {
+    const locked = false;
+    const changeFaction = document.getElementById("change-faction");
+    if (changeFaction) changeFaction.classList.toggle("noclick", locked);
+    const cardLeader = document.getElementById("card-leader");
+    if (cardLeader) cardLeader.classList.toggle("leader-locked", locked);
+    const selectDeck = document.getElementById("select-deck");
+    if (selectDeck) selectDeck.classList.toggle("noclick", locked);
+  },
+  // Apply the remote peer's Random Leader lock locally. The peer who chose
+  // Random Leader already sent a lobby-opleader-seed; if it has arrived, apply
+  // it now, otherwise wait for routeLobby to apply it on arrival.
+  applyRandomLeaderForSelf() {
+    if (this._randomLeaderApplied) return;
+    if (this._inRandomLeaderSeed == null) return;
+    this._randomLeaderApplied = true;
+    this._applyRandomLeaderSeed(this._inRandomLeaderSeed);
+  },
+  // Pick a random leader+deck from the full "Select Own Deck" pool: every
+  // premade deck across all factions. This mirrors selecting a deck manually
+  // under "Select Own Deck" (setFaction + deckFromJSON), so the whole deck
+  // composition follows the picked leader. Each peer resolves from its own
+  // incoming seed, so the two picks are independent.
+  _applyRandomLeaderSeed(seed) {
+    if (!dm || typeof premade_deck === "undefined" || typeof card_dict === "undefined" || typeof factions === "undefined") return;
+    const pool = Object.values(premade_deck)
+      .filter(d => d.leader && card_dict[d.leader] && card_dict[d.leader].row === "leader");
+    if (!pool.length) return;
+    const s = (seed >>> 0) || 1;
+    let x = s;
+    const next = () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x; };
+    const deck = pool[next() % pool.length];
+    dm.deckFromJSON(deck, false);
+    if (dm.leader_elem && dm.leader_elem.children[1]) getPreviewElem(dm.leader_elem.children[1], dm.leader.card);
+    this.updateLobby("Opponent chose Random Leader — your leader+deck locked.", OnlineNet.code);
+  },
   routeLobby(m) {
     if (m.t === "lobby-ready") { this.remoteDeck = m.deck; this.remoteReady = this.validateDeckRaw(m.deck); this.updateReadyUI(); this.updateDeckStartButton(); this.updateRematchUI(); return this.maybeStartAsHost(); }
     if (m.t === "lobby-unready") { this.remoteReady = false; this.remoteDeck = null; this.updateReadyUI(); this.updateDeckStartButton(); return this.updateRematchUI(); }
@@ -671,6 +765,19 @@ const GwentOnline = {
       this.updateReadyUI();
       this.updateRematchUI();
       return this.updateLobby("Opponent is customizing their deck.", OnlineNet.code);
+    }
+    if (m.t === "lobby-opleader") {
+      this.remoteOpLeaderChoice = (m.choice === "random") ? "random" : "normal";
+      this.applyRemoteOpLeaderLock();
+      return;
+    }
+    if (m.t === "lobby-opleader-seed") {
+      this._inRandomLeaderSeed = m.seed >>> 0;
+      // A re-roll sends a new seed; allow it to apply even if a previous
+      // random leader was already resolved.
+      this._randomLeaderApplied = false;
+      this.applyRandomLeaderForSelf();
+      return;
     }
     if (m.t === "lobby-start") {
       if (m.firstRole !== "host" && m.firstRole !== "guest") return this.desync("Invalid opening-player role in match handshake");
@@ -702,6 +809,7 @@ const GwentOnline = {
     this._matchAbort = new AbortController();
     this.active = true; this.role = OnlineNet.role; this.queue = []; this.waiters = [];
     this._turnSeq = 0;
+    this._randomLeaderApplied = false;
     this._decisionSerial = 0;
     this._effectDecisionSerial = 0;
     this._decisionOwner = null;
@@ -798,6 +906,16 @@ const GwentOnline = {
     const prevOwner = this._decisionOwner;
     const prevContext = this._effectContext;
     const prevEffectDecisionSerial = this._effectDecisionSerial;
+    // Scope the RNG to the effect owner so each player's delayed effects
+    // (roundStart/roundEnd/turnStart/turnEnd) consume an independent RNG
+    // stream. The shared gameRng would otherwise diverge when asynchronous
+    // effect bodies (notifications, animations) interleave differently on
+    // the two peers, causing randomized effects such as Skellige's round-3
+    // graveyard revive to select different cards and desync at the round-phase
+    // barrier. deckRng is already per-role and seed-stable across browsers.
+    const prevRngScope = this.rngScope;
+    const ownerRole = player ? this.roleOfPlayer(player) : null;
+    if (ownerRole) this.rngScope = ownerRole;
     this._decisionOwner = player || prevOwner || null;
     // Decision ids inside a delayed/owned effect must be deterministic on both
     // peers. A match-global serial is unsafe because local-only UI interactions
@@ -815,6 +933,7 @@ const GwentOnline = {
         this._decisionOwner = prevOwner;
         this._effectContext = prevContext;
         this._effectDecisionSerial = prevEffectDecisionSerial;
+        this.rngScope = prevRngScope;
       }
     }
   },
@@ -1794,6 +1913,24 @@ const GwentOnline = {
       if (self.active && !self._sendingSuppressed && this === player_me && game.currPlayer === player_me) self.send({t:"action", a:"pass", preState:self.zoneSnapshot(player_me)});
       return oldPass.call(this);
     };
+    // v1.4.x: replaceLeader (used by Wild Hunt's round-start leader swap and
+    // some ability continuations) runs the new leader's placed() handler, which
+    // may push delayed lifecycle hooks (turnEnd/turnStart/...) onto the game
+    // arrays. Those hooks must be wrapped in the owner's decision context,
+    // exactly like the initial leader init at startGame, otherwise they run
+    // with a null effect context. A null context makes their interactive
+    // popups use the match-global decision serial, which diverges between the
+    // two peers and eventually times out as "Timed out waiting for popup
+    // choice (...:turn:popup:N)".
+    const oldReplaceLeader = Player.prototype.replaceLeader;
+    Player.prototype.replaceLeader = function(newLeader) {
+      if (!self.active) return oldReplaceLeader.call(this, newLeader);
+      const hookNames = ['gameStart','roundStart','roundEnd','turnStart','turnEnd','unitDestroyed'];
+      const before = Object.fromEntries(hookNames.map(n => [n, Array.isArray(game?.[n]) ? game[n].length : 0]));
+      const r = oldReplaceLeader.call(this, newLeader);
+      self.bindNewGameHooks(this, before, `leader:${newLeader?.key || 'unknown'}:placed`);
+      return r;
+    };
     const oldLeader = Player.prototype.activateLeader;
     Player.prototype.activateLeader = async function(...args) {
       if (self.active && args[0] !== false && !self._sendingSuppressed && this === player_me && game.currPlayer === player_me) self.send({t:"action", a:"leader", preState:self.zoneSnapshot(player_me)});
@@ -1804,7 +1941,16 @@ const GwentOnline = {
     Player.prototype.activateFactionAbility = async function(...args) {
       if (!self.active) return oldActivateFaction.apply(this, args);
       return self.withDecisionOwner(this, async () => {
-        if (this === player_me) self._suppressPopupWire = true;
+        // The "Use faction ability?" confirm popup is a local-only UI prompt;
+        // it never carries a gameplay choice to replay on the peer. Always
+        // suppress the synced popup-wire for it (regardless of which player
+        // object triggers it) so it can never open a beginDecision that the
+        // remote peer has no matching decision for and time out. The actual
+        // faction ability runs through useFactionAbility(), whose own
+        // withDecisionOwner scope ("faction:...:use") and any inner popups
+        // remain fully synced because the suppress flag is consumed by the
+        // confirm popup before the ability body runs.
+        self._suppressPopupWire = true;
         try { return await oldActivateFaction.apply(this, args); } finally { self._suppressPopupWire = false; }
       }, `faction:${this.deck?.faction || 'unknown'}:activate`);
     };
@@ -2189,6 +2335,7 @@ const GwentOnline = {
     const lobby = document.getElementById("online-lobby");
     if (!friend && lobby) lobby.classList.add("hide");
     this.updateDeckStartButton();
+    if (friend) this.applyRemoteOpLeaderLock(); else this.clearOpLeaderLock();
   },
 
   canReadyFromDeckBuilder() {
@@ -2274,6 +2421,11 @@ const GwentOnline = {
       OnlineNet.resetRoom();
       this.localReady = false; this.remoteReady = false; this.remoteDeck = null;
       this.peerConnected = false;
+      this.remoteOpLeaderChoice = null;
+      this._randomLeaderApplied = false;
+      this._inRandomLeaderSeed = null;
+      this._outRandomLeaderSeed = null;
+      this.clearOpLeaderLock();
       this.updateReadyUI();
       this.updateDeckStartButton();
       // WebSocket frames are ordered, so a preceding leave is processed before create/join.
