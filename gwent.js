@@ -4418,6 +4418,11 @@ let row = this.lastRow;
             return; // If a unit can be selected, we cannot select the whole row
         let card = this.previewCard;
         let holder = card.holder;
+        if ((card.isUnit() || card.hero) && !card.abilities.includes("ambush")) {
+            let currRows = card.row.includes("agile") ? board.getAgileRows(card, card.holder) : [board.getRow(card, card.row, card.holder)];
+            if (!currRows.includes(row))
+                return; // Units and heroes can only be placed on their own valid rows
+        }
         this.hidePreview();
         this.enablePlayer(false);
         if (card.faction === "special" && card.abilities.includes("scorch")) {
@@ -5094,6 +5099,7 @@ navigator.vibrate(50);
                 row.elem.classList.add("row-selectable");
             } else {
                 row.elem.classList.add("noclick");
+                row.special.elem.classList.add("noclick");
             }
         }
 
