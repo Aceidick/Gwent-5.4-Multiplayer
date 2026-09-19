@@ -524,6 +524,7 @@ class ControllerAI {
                 }
             }
             targ.decoyTarget = true;
+            targ.holder = this.player;
             await sleep(1000);
             await board.toHand(targ, row);
         } else {
@@ -538,7 +539,7 @@ class ControllerAI {
     }
 
 async cull(card, max, data) {
-		await this.playCull(card);
+		await this.player.playCull(card);
 	}
 
     // Tells the controlled Player to play the Scorch card
@@ -1431,10 +1432,9 @@ async playCull(card) {
             await this.endturn_action();
             return;
         }
-        if (!this.passed && !this.canPlay()) {
-            this.setPassed(true);
-            ui.notification("op-pass", 1200);
-        }
+        // Auto-passing a player who cannot act anymore is deferred to
+        // Game.endTurn so end-of-turn effects (e.g. Holger an Dimun:
+        // Blackhand's strength edit) are still offered after the last card.
         if (this === player_me) {
             document.getElementById("pass-button").classList.add("noclick");
             may_pass1 = false;
@@ -2241,8 +2241,8 @@ class Row extends CardContainer {
         }
         if (runEffect && this.effects.ambush) {
             let ambushCards = this.cards.filter(c => c.abilities.includes("ambush") &&
-                (c.holder !== card.holder && !card.abilities.includes("spy") && !card.abilities.includes("emissary")) ||
-                (c.holder === card.holder && (card.abilities.includes("spy") || card.abilities.includes("emissary")))); // Spy/Emissaries switch sides before being placed and would have triggerd when played by the owner of an ambush card
+                ((c.holder !== card.holder && !card.abilities.includes("spy") && !card.abilities.includes("emissary")) ||
+                (c.holder === card.holder && (card.abilities.includes("spy") || card.abilities.includes("emissary"))))); // Spy/Emissaries switch sides before being placed and would have triggerd when played by the owner of an ambush card
             if (ambushCards.length > 0 && ambushCards[0] !== card) {
                 let targetCard = ambushCards[0];
                 // Remove status first before animations to avoid triggering the ambush several times when several cards arrive at the same time
@@ -2281,6 +2281,8 @@ class Row extends CardContainer {
             card.locked = false;
         }
         this.updateState(card, false);
+        if (card.abilities.includes("ambush"))
+            this.effects.ambush = this.cards.some(c => c !== card && c.abilities.includes("ambush") && !c.isLocked());
         if (runEffect) {
             // Decoy targets do no trigger the removed effect, exept for cards holding a door opened, door closes when they leave the row
             if (!card.decoyTarget || card.abilities.includes("door_o")) {
@@ -3163,6 +3165,12 @@ tocar("coin", false);
 
 if (!noEffects)
             await this.runEffects(this.turnEnd);
+        // Auto-pass after end-of-turn effects so abilities such as Holger an
+        // Dimun: Blackhand are still offered when the last card was played.
+        if (!this.currPlayer.passed && !this.currPlayer.canPlay()) {
+            this.currPlayer.setPassed(true);
+            ui.notification("op-pass", 1200);
+        }
         // Player might have "end turn" events which delay the actual end of the turn
         if (this.currPlayer.endturn_action) {
             // Call action instead of ending turn
@@ -4376,6 +4384,7 @@ let row = this.lastRow;
             this.hidePreview(card);
             this.enablePlayer(false);
             card.decoyTarget = true;
+            card.holder = pCard.holder;
             await board.toHand(card, row);
             await board.moveTo(pCard, row, pCard.holder.hand);
             await pCard.holder.endTurn();

@@ -1410,6 +1410,10 @@ const GwentOnline = {
       if (this.currPlayer?.passed) noEffects = true;
       if (!noEffects) await this.runEffects(this.turnEnd);
       if (this.over || self._matchAbort?.signal.aborted) return;
+      if (!this.currPlayer.passed && !this.currPlayer.canPlay()) {
+        this.currPlayer.setPassed(true);
+        ui.notification('op-pass', 1200);
+      }
       if (this.currPlayer.endturn_action) {
         await this.currPlayer.endturn_action();
         return;
@@ -1536,7 +1540,6 @@ const GwentOnline = {
     Player.prototype.endTurn = async function(noEffects=false) {
       if (!self.active) return oldPlayerEndTurn.call(this, noEffects);
       if (this.endturn_action) { await this.endturn_action(); return; }
-      if (!this.passed && !this.canPlay()) { this.setPassed(true); ui.notification('op-pass', 1200); }
       if (this === player_me) { document.getElementById('pass-button')?.classList.add('noclick'); may_pass1 = false; }
       document.getElementById('stats-' + this.tag)?.classList.remove('current-turn');
       this.elem_leader?.children?.[1]?.classList.add('hide');
