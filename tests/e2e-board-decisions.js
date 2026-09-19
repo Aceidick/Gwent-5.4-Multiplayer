@@ -203,7 +203,6 @@ async function wait(page, fn, label, timeout=60000) {
   await holger.local.evaluate(()=>{document.getElementById('number-popup-value').value='0';NumberValuePopup.curr.done();});
   await committed(holger,'Holger turn-end selection');
   assert(await holger.remote.evaluate(()=>fixtureCards[0].basePower===0),'Holger zero strength replicated');
-
   const interrupted=await setup('sc_francesca_pureblood',true);
   await activate(interrupted);
   await interrupted.local.waitForFunction(()=>ui.underRearrangement);
@@ -217,6 +216,42 @@ async function wait(page, fn, label, timeout=60000) {
   await A.evaluate(()=>Carousel.curr.cancel()); await B.evaluate(()=>Carousel.curr.cancel());
   await Promise.all([A,B].map(p=>p.waitForFunction(()=>game.roundCount===1 && !game.over)));
   assert(await A.evaluate(()=>!GwentOnline._rearrangement && !GwentOnline._abilityTarget && !GwentOnline._powerEdit),'rematch has no stale board decision');
+  // Regression: leader-edited temporary strength (Holger an Dimun: Blackhand)
+  // must count toward the round score before reverting (Kambi 0->10 must beat
+  // a passing opponent). Both peers build the same fixture in lockstep.
+  {
+    await Promise.all([A,B].map(p=>p.waitForFunction(()=>game.roundCount===1&&!!game.currPlayer&&!GwentOnline._decisionOwner&&!GwentOnline._effectContext&&!GwentOnline.queue.length,null,{timeout:30000})));
+    await new Promise(r=>setTimeout(r,800));
+    const hostMoves=await Promise.all([A,B].map(p=>p.evaluate(()=>game.currPlayer===player_me)));
+    const hostMovesStable=hostMoves[0]===hostMoves[1]&&hostMoves[0];
+    const starter=hostMovesStable?A:B, responder=hostMovesStable?B:A;
+    const starterRole=hostMovesStable?'host':'guest';
+    for(const p of [A,B]) await p.evaluate(async role=>{
+      const actor=GwentOnline.playerOf(role);
+      for(const row of board.row)
+        for(const c of row.cards.filter(c=>!c.noRemove).slice())
+          await board.toGrave(c,row,true);
+      const kambiCard=new Card('sk_kambi',card_dict.sk_kambi,actor);
+      kambiCard.locked=true;
+      await board.addCardToRow(kambiCard,'close',actor);
+      kambiCard.originalBasePower=kambiCard.basePower;
+      kambiCard.basePower=10;
+      kambiCard.temporaryPower=true;
+      board.updateScores();
+    },starterRole);
+    await Promise.all([A,B].map(p=>p.waitForFunction(()=>board.row.some(r=>r.cards.some(c=>c.key==='sk_kambi'&&c.basePower===10))&&player_me.total+player_op.total===10,'kambi fixture settled')));
+    assert(await starter.evaluate(()=>player_me.total===10&&player_op.total===0),'edited temporary strength counts toward the player total');
+    const seq=await A.evaluate(()=>GwentOnline._turnSeq);
+    await starter.evaluate(()=>{ player_me.passRound(); });
+    await Promise.all([A,B].map(p=>p.waitForFunction(sq=>GwentOnline._turnSeq===sq+1,seq,{timeout:20000})));
+    await responder.waitForFunction(()=>game.currPlayer===player_me&&!GwentOnline._sendingSuppressed,null,{timeout:20000});
+    await responder.waitForTimeout(250);
+    await responder.evaluate(()=>{ player_me.passRound(); });
+    await Promise.all([A,B].map(p=>p.waitForFunction(()=>game.roundCount===2,{timeout:30000})));
+    assert(await starter.evaluate(()=>game.roundHistory.at(-1).winner===player_me&&game.roundHistory.at(-1).score_me===10&&game.roundHistory.at(-1).score_op===0),'edited temporary strength wins the round with the edited score');
+    assert(await responder.evaluate(()=>game.roundHistory.at(-1).winner===player_op),'round winner matches on the responding peer');
+    assert(await starter.evaluate(()=>player_me.grave.cards.some(c=>c.key==='sk_kambi'&&c.basePower===0&&!c.temporaryPower)&&player_me.getAllRowCards().every(c=>c.key!=='sk_kambi'||c.basePower===0)),'temporary strength reverted after round scoring');
+  }
   assert(errs.A.length===0,'no host errors '+errs.A.join(' | '));
   assert(errs.B.length===0,'no guest errors '+errs.B.join(' | '));
   if(failed) throw Error('Regression assertions failed');
