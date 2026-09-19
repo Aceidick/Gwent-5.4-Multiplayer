@@ -4700,13 +4700,24 @@ navigator.vibrate(50);
     // Displays a Carousel menu of filtered container items that match the predicate.
     // Suspends gameplay until the Carousel is closed. Automatically picks random card if activated for AI player
     async queueCarousel(container, count, action, predicate, bSort, bQuit, title, bRedraw = false) {
-        /*if (game.currPlayer && game.currPlayer.controller instanceof ControllerAI) {
-            for (let i = 0; i < count; ++i) {
-                let cards = container.cards.reduce((a, c, i) => !predicate || predicate(c) ? a.concat([i]) : a, []);
-                await action(container, cards[randomInt(cards.length)]);
+        // Offline AI decisions: when the chooser is a ControllerAI (player vs
+        // computer / AI vs AI), the carousel has no human to drive it. Left to
+        // its own devices Carousel.completion never resolves and the game
+        // freezes. Auto-pick weighted candidates instead. Online mode wraps
+        // queueCarousel separately, so this branch only fires offline.
+        const chooser = game.currPlayer;
+        if (chooser && chooser.controller instanceof ControllerAI &&
+            !(window.GwentOnline && GwentOnline.active)) {
+            let indices = container.cards.reduce((a, c, i) => (!predicate || predicate(c)) ? a.concat([i]) : a, []);
+            let picks = Math.min(count, indices.length);
+            for (let i = 0; i < picks; ++i) {
+                if (indices.length === 0) break;
+                let pick = indices[randomInt(indices.length)];
+                indices = indices.filter(idx => idx !== pick);
+                await action(container, pick);
             }
             return;
-        }*/
+        }
         let carousel = new Carousel(container, count, action, predicate, bSort, bQuit, title, bRedraw);
         if (Carousel.curr === undefined || Carousel.curr === null) {
             carousel.start();
@@ -5699,6 +5710,12 @@ class DeckMaker {
         this.leader_elem.children[1].addEventListener("mouseout", function () {
             this.style.boxShadow = "0 0 0 #6d5210"
         });
+        this.leader_elem.children[1].addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.viewLeader();
+            return false;
+        }, false);
 
         this.faction = "realms";
         this.setFaction(this.faction, true);
@@ -5715,6 +5732,7 @@ class DeckMaker {
         this.start_op_deck;
         this.me_deck_index = 0;
         this.op_deck_index = 0;
+        this.op_leader_choice = "normal";
 
         this.change_elem = document.getElementById("change-faction");
         this.change_elem.addEventListener("click", () => this.selectFaction(), false);
@@ -5831,6 +5849,8 @@ if (toggleBtn) {
 
         document.getElementById("select-deck").addEventListener("click", () => this.selectDeck(), false);
         document.getElementById("select-op-deck").addEventListener("click", () => this.selectOPDeck(), false);
+        document.getElementById("select-op-leader").addEventListener("click", () => this.selectOPLeader(), false);
+        document.getElementById("op-leader-name").addEventListener("click", () => this.rerollOPLeader(), false);
         document.getElementById("download-deck").addEventListener("click", () => this.downloadDeck(), false);
         document.getElementById("add-file").addEventListener("change", () => this.uploadDeck(), false);
 document.getElementById("save-internal-deck").addEventListener("click", () => this.saveDeckInternal(), false);
@@ -6111,6 +6131,7 @@ makePreview(index, num, container_elem, cards) {
 
     // Opens a Carousel to allow the client to select a leader for their deck
     selectLeader() {
+        if (this.leader_elem && this.leader_elem.classList.contains("leader-locked")) return;
         let container = new CardContainer();
         container.cards = this.leaders.map(c => {
             let card = new Card(c.index, c.card, player_me);
@@ -6126,6 +6147,20 @@ makePreview(index, num, container_elem, cards) {
         }, () => true, false, true);
         Carousel.curr.index = index;
         Carousel.curr.update();
+    }
+
+    // View-only: opens a Carousel showing the current leader (and its ability)
+    // without allowing it to be changed. Used by the right-click handler when
+    // the leader is locked (Random Leader mode) so a player can still inspect
+    // the leader ability.
+    viewLeader() {
+        if (!this.leader || !this.leader.card) return;
+        let container = new CardContainer();
+        let card = new Card(this.leader.index, this.leader.card, player_me);
+        card.data = this.leader;
+        container.cards = [card];
+        ui.viewCardsInContainer(container);
+        if (Carousel.curr) { Carousel.curr.index = 0; Carousel.curr.update(); }
     }
 
        // Opens a Carousel to allow the client to select a faction for their deck
@@ -6339,6 +6374,57 @@ makePreview(index, num, container_elem, cards) {
         }, () => true, false, true);
         Carousel.curr.index = this.op_deck_index;
         Carousel.curr.update();
+    }
+
+    // Friend-mode only: lets a player choose how the opponent's leader is set.
+    // "Random Leader" locks the opponent's leader+faction to a seeded random
+    // pick (deterministic across both peers); "Normal" lets the opponent pick
+    // their leader+faction freely. Each player's choice applies to the OTHER
+    // player. Only the deck composition stays editable under Random Leader.
+    selectOPLeader() {
+        let container = new CardContainer();
+        container.cards = [
+            {
+                abilities: [],
+                name: "Normal",
+                row: "leader",
+                filename: "normal",
+                desc_name: "Normal",
+                desc: "<p>Opponent chooses their own leader and faction freely.</p>",
+                faction: "faction"
+            },
+            {
+                abilities: [],
+                name: "Random Leader",
+                row: "leader",
+                filename: "random",
+                desc_name: "Random Leader",
+                desc: "<p>Opponent's leader and faction are chosen at random (locked). Opponent may still build their deck freely.</p>",
+                faction: "faction"
+            }
+        ];
+        const cur = (this.op_leader_choice === "random") ? 1 : 0;
+        ui.queueCarousel(container, 1, (c, i) => {
+            this.op_leader_choice = (i === 1) ? "random" : "normal";
+            const opNameEl = document.getElementById("op-leader-name");
+            if (opNameEl) {
+                opNameEl.innerHTML = this.op_leader_choice === "random" ? "Random Leader" : "Normal";
+                opNameEl.classList.toggle("rerollable", this.op_leader_choice === "random");
+            }
+            if (window.GwentOnline && typeof window.GwentOnline.onOpLeaderChoice === "function")
+                window.GwentOnline.onOpLeaderChoice(this.op_leader_choice);
+        }, () => true, false, true);
+        Carousel.curr.index = cur;
+        Carousel.curr.update();
+    }
+
+    // Re-randomize the opponent's leader. Only active when this player has
+    // already chosen "Random Leader"; clicking the "Random Leader" text under
+    // Select Opponent Leader re-rolls the seeded random pick for the peer.
+    rerollOPLeader() {
+        if (this.op_leader_choice !== "random") return;
+        if (window.GwentOnline && typeof window.GwentOnline.rerollOpLeader === "function")
+            window.GwentOnline.rerollOpLeader();
     }
 
     // Called by the client to downlaod the current deck as a JSON file
