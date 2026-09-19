@@ -3182,14 +3182,10 @@ if (!noEffects)
     async endRound() {
         limpar();
 
-        // Clean and update scores
-        board.row.forEach(r => {
-            r.cards.forEach(c => {
-                if (c.temporaryPower)
-                    c.basePower = c.originalBasePower;
-            });
-            r.updateScore();
-        });
+        // Update scores with the current card strengths, including leader-edited
+        // temporary values (e.g. Holger an Dimun: Blackhand), which must count
+        // toward the round score before reverting.
+        board.row.forEach(r => r.updateScore());
         board.updateScores();
         let dif = player_me.total - player_op.total;
         if (dif === 0) {
@@ -3204,6 +3200,16 @@ if (!noEffects)
             score_op: player_op.total
         }
         this.roundHistory.push(verdict);
+        // Leader-edited strengths (e.g. Holger an Dimun: Blackhand) only count
+        // toward the round scoring above; revert them before the board is
+        // cleared so carried-over and future rounds use the original value.
+        board.row.forEach(r => r.cards.forEach(c => {
+            if (c.temporaryPower) {
+                c.basePower = c.originalBasePower;
+                c.originalBasePower = null;
+                c.temporaryPower = false;
+            }
+        }));
 
         await this.runEffects(this.roundEnd);
 
