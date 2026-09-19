@@ -524,6 +524,7 @@ class ControllerAI {
                 }
             }
             targ.decoyTarget = true;
+            targ.holder = this.player;
             await sleep(1000);
             await board.toHand(targ, row);
         } else {
@@ -4381,6 +4382,7 @@ let row = this.lastRow;
             this.hidePreview(card);
             this.enablePlayer(false);
             card.decoyTarget = true;
+            card.holder = pCard.holder;
             await board.toHand(card, row);
             await board.moveTo(pCard, row, pCard.holder.hand);
             await pCard.holder.endTurn();
