@@ -538,7 +538,7 @@ class ControllerAI {
     }
 
 async cull(card, max, data) {
-		await this.playCull(card);
+		await this.player.playCull(card);
 	}
 
     // Tells the controlled Player to play the Scorch card
@@ -1431,10 +1431,9 @@ async playCull(card) {
             await this.endturn_action();
             return;
         }
-        if (!this.passed && !this.canPlay()) {
-            this.setPassed(true);
-            ui.notification("op-pass", 1200);
-        }
+        // Auto-passing a player who cannot act anymore is deferred to
+        // Game.endTurn so end-of-turn effects (e.g. Holger an Dimun:
+        // Blackhand's strength edit) are still offered after the last card.
         if (this === player_me) {
             document.getElementById("pass-button").classList.add("noclick");
             may_pass1 = false;
@@ -3163,6 +3162,12 @@ tocar("coin", false);
 
 if (!noEffects)
             await this.runEffects(this.turnEnd);
+        // Auto-pass after end-of-turn effects so abilities such as Holger an
+        // Dimun: Blackhand are still offered when the last card was played.
+        if (!this.currPlayer.passed && !this.currPlayer.canPlay()) {
+            this.currPlayer.setPassed(true);
+            ui.notification("op-pass", 1200);
+        }
         // Player might have "end turn" events which delay the actual end of the turn
         if (this.currPlayer.endturn_action) {
             // Call action instead of ending turn
