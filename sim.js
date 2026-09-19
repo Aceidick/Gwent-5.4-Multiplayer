@@ -396,6 +396,7 @@ class ControllerAI {
                 }
             }
             targ.decoyTarget = true;
+            targ.holder = this.player;
             board.toHand(targ, row);
         } else {
             row = ["close", "agile"].includes(card.row) ? board.getRow(card, "close", this.player) : card.row === "ranged" ? board.getRow(card, "ranged", this.player) : board.getRow(card, "siege", this.player);
@@ -2255,6 +2256,7 @@ class UI {
         } else if (pCard.abilities.includes("decoy")) {
             this.hidePreview(card);
             card.decoyTarget = true;
+            card.holder = pCard.holder;
             board.toHand(card, row);
             await board.moveTo(pCard, row, pCard.holder.hand);
             await pCard.holder.endTurn();
