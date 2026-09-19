@@ -2241,8 +2241,8 @@ class Row extends CardContainer {
         }
         if (runEffect && this.effects.ambush) {
             let ambushCards = this.cards.filter(c => c.abilities.includes("ambush") &&
-                (c.holder !== card.holder && !card.abilities.includes("spy") && !card.abilities.includes("emissary")) ||
-                (c.holder === card.holder && (card.abilities.includes("spy") || card.abilities.includes("emissary")))); // Spy/Emissaries switch sides before being placed and would have triggerd when played by the owner of an ambush card
+                ((c.holder !== card.holder && !card.abilities.includes("spy") && !card.abilities.includes("emissary")) ||
+                (c.holder === card.holder && (card.abilities.includes("spy") || card.abilities.includes("emissary"))))); // Spy/Emissaries switch sides before being placed and would have triggerd when played by the owner of an ambush card
             if (ambushCards.length > 0 && ambushCards[0] !== card) {
                 let targetCard = ambushCards[0];
                 // Remove status first before animations to avoid triggering the ambush several times when several cards arrive at the same time
@@ -2281,6 +2281,8 @@ class Row extends CardContainer {
             card.locked = false;
         }
         this.updateState(card, false);
+        if (card.abilities.includes("ambush"))
+            this.effects.ambush = this.cards.some(c => c !== card && c.abilities.includes("ambush") && !c.isLocked());
         if (runEffect) {
             // Decoy targets do no trigger the removed effect, exept for cards holding a door opened, door closes when they leave the row
             if (!card.decoyTarget || card.abilities.includes("door_o")) {
