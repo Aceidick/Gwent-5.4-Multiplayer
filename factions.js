@@ -158,7 +158,7 @@ var factions = {
         factionAbility: async player => {
             let monsters = player.getAllRowCards().filter(c => c.abilities.includes("monster_toussaint") && !c.isLocked());
             if (monsters.length < 1)
-                return;
+                return false;
             let targetCard = null;
             if (player.controller instanceof ControllerAI) {
                 let targets = monsters.map(c => new Card(c.target, card_dict[c.target], player));
@@ -180,6 +180,8 @@ var factions = {
                     await player.selectCardDestination(newCard, player.deck);
                 }
             }
+            if (!targetCard)
+                return false;
         },
         factionAbilityInit: player => {
             game.gameStart.push(async () => {

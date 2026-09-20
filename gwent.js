@@ -4653,7 +4653,7 @@ navigator.vibrate(50);
             "notif-skellige-op": "Opponent Skellige Ability Triggered!",
             "notif-skellige-me": "Skellige Ability Triggered!",
             "notif-witcher_universe": "Witcher Universe used its faction ability and skipped a turn",
-            "notif-toussaint": "Toussaint faction ability triggered - Toussaint draws an additional card.",
+            "notif-toussaint": "Toussaint faction ability used - a Monster of Toussaint transformed into its stronger form.",
             "notif-toussaint-decoy-cancelled": "Toussaint Leader ability used - Decoy ability cancelled for the rest of the round.",
             "notif-lyria_rivia": "Lyria & Rivia ability used - Morale Boost effect applied to a row.",
             "notif-meve_white_queen": "Lyria & Rivia leader allows both players to restore 2 units when using the medic ability.",

@@ -452,7 +452,7 @@ html {
 }
 
 #notif-toussaint::after{
-	content: "Toussaint faction ability used: \A Toussaint draws an additional card.";
+	content: "Toussaint faction ability used: \A A Monster of Toussaint transformed into its stronger form.";
 }
 
 #notif-toussaint-decoy-cancelled::after {
