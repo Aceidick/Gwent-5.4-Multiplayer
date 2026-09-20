@@ -158,7 +158,7 @@ var factions = {
         factionAbility: async player => {
             let monsters = player.getAllRowCards().filter(c => c.abilities.includes("monster_toussaint") && !c.isLocked());
             if (monsters.length < 1)
-                return;
+                return false;
             let targetCard = null;
             if (player.controller instanceof ControllerAI) {
                 let targets = monsters.map(c => new Card(c.target, card_dict[c.target], player));
@@ -180,6 +180,8 @@ var factions = {
                     await player.selectCardDestination(newCard, player.deck);
                 }
             }
+            if (!targetCard)
+                return false;
         },
         factionAbilityInit: player => {
             game.gameStart.push(async () => {
@@ -402,14 +404,8 @@ tocar("game_buy", false);
                 for (var i = 0; i < openedDoors.length; i++) {
                     if (player.deck.cards.length > 0) {
                         let door = openedDoors[i];
-                        let card = null;
-                        
-                        try {
-                            card = player.deck.cards.shift();
-                        } catch (deckErr) {
-                            console.warn("Extracción de última carta controlada.");
-                        }
-                        
+                        let card = player.deck.cards[0];
+
                         if (!card) continue;
                         
                         ui.showPreviewVisuals(card);
@@ -438,65 +434,45 @@ tocar("game_buy", false);
                         ui.previewCard = null;
                         
                         if (play) {
-                            if (!(player.controller instanceof ControllerAI)) {
+                            let filaDestino = player.getAllRows().find(r => r.special.cards.includes(door));
+                            if (card.name === "Decoy" || !filaDestino) {
+                                player.deck.addCard(player.deck.removeCard(0));
+                            } else if (!(player.controller instanceof ControllerAI)) {
                                 let choiceDone = false;
                                 await player.selectCardDestination(card, player.deck, async () => {
                                     choiceDone = true;
                                     if (typeof ui.enablePlayer === "function") ui.enablePlayer(true);
                                 });
                                 await sleepUntil(() => choiceDone, 100);
+                            } else if (card.key === "spe_scorch" || card.name === "Scorch") {
+                                if (typeof player.getAIController === "function" && player.getAIController().playCardDefault) {
+                                    await player.getAIController().playCardDefault(card, player.deck);
+                                } else if (player.controller.playCardDefault) {
+                                    await player.controller.playCardDefault(card, player.deck);
+                                } else if (typeof player.playScorch === "function") {
+                                    await player.playScorch(card);
+                                }
+                                await sleep(600);
+                                if (typeof board !== "undefined" && board.updateScores) board.updateScores();
                             } else {
-                                let filaDestino = player.getAllRows().find(r => r.special.cards.includes(door));
-                                if (card.name === "Decoy" || !filaDestino) {
-                                    player.deck.addCard(card);
-                                } else if (card.key === "spe_scorch" || card.name === "Scorch") {
-                                    if (typeof player.getAIController === "function" && player.getAIController().playCardDefault) {
-                                        await player.getAIController().playCardDefault(card, player.deck);
-                                    } else if (player.controller.playCardDefault) {
-                                        await player.controller.playCardDefault(card, player.deck);
-                                    }
-                                    await sleep(600);
-                                    if (typeof board !== "undefined" && board.updateScores) board.updateScores();
-                                } else {
                                     if (card.row === "weather") {
-                                        let contenedorClima = (typeof weather !== "undefined") ? weather : filaDestino.special;
-                                        contenedorClima.addCard(card);
-                                        card.currentLocation = contenedorClima;
-                                        if (typeof game.addCardElement === "function") {
-                                            game.addCardElement(card);
-                                        } else if (typeof contenedorClima.addCardElement === "function") {
-                                            contenedorClima.addCardElement(card);
-                                        }
-                                        if (typeof card.placed === "object" && card.placed.length > 0) {
-                                            for (let x of card.placed) { await x(card, contenedorClima); }
-                                        } else if (typeof board.updateWeather === "function") {
-                                            await board.updateWeather();
-                                        }
+                                        await board.toWeather(card, player.deck);
                                     } else if (!card.isUnit() && !card.hero) {
+                                        await board.moveTo(card, player.hand, player.deck);
                                         if (typeof player.playCard === "function") {
-                                            await player.playCard(card, filaDestino);
+                                            await player.playCard(card);
                                         } else if (player.controller.playCardDefault) {
                                             await player.controller.playCardDefault(card, player.deck); 
                                         }
                                     } else {
-                                        filaDestino.addCard(card);
-                                        card.currentLocation = filaDestino;
-                                        if (typeof game.addCardElement === "function") {
-                                            game.addCardElement(card);
-                                        } else if (typeof filaDestino.addCardElement === "function") {
-                                            filaDestino.addCardElement(card);
-                                        }
-                                        if (typeof card.placed === "object" && card.placed.length > 0) {
-                                            for (let x of card.placed) { await x(card, filaDestino); }
-                                        } 
+                                        await board.moveTo(card, filaDestino, player.deck);
                                     }
                                     await sleep(400);
                                     if (typeof board !== "undefined" && board.updateScores) board.updateScores();
                                     if (typeof game.resize === "function") game.resize();
-                                }              
-                            }
+                                }
                         } else {
-                            player.deck.addCard(card);
+                            player.deck.addCard(player.deck.removeCard(0));
                         } 
                     }
                 }         
