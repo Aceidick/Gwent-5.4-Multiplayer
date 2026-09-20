@@ -3308,9 +3308,9 @@ if (canVibrate) navigator.vibrate(1000);
     // Returns the client to the deck customization screen
     returnToCustomization() {
         iniciarMusica();
-        this.reset();
         player_me.reset();
         player_op.reset();
+        this.reset();
         ui.toggleMusic_elem.classList.add("music-customization");
 actualizarPosicionMusicaMovel();
         this.endScreen.classList.add("hide");
@@ -3874,14 +3874,14 @@ if (giveupBtn) {
         tocar("pass", false);
 
         limpar();
-        if (typeof game !== "undefined" && typeof game.reset === "function") {
-            game.reset();
-        }
         if (typeof player_me !== "undefined" && typeof player_me.reset === "function") {
             player_me.reset();
         }
         if (typeof player_op !== "undefined" && typeof player_op.reset === "function") {
             player_op.reset();
+        }
+        if (typeof game !== "undefined" && typeof game.reset === "function") {
+            game.reset();
         }
 
         if (typeof player_me !== "undefined") {
@@ -3980,14 +3980,14 @@ if (giveupBtnMobile) {
         tocar("pass", false);
 
         limpar();
-        if (typeof game !== "undefined" && typeof game.reset === "function") {
-            game.reset();
-        }
         if (typeof player_me !== "undefined" && typeof player_me.reset === "function") {
             player_me.reset();
         }
         if (typeof player_op !== "undefined" && typeof player_op.reset === "function") {
             player_op.reset();
+        }
+        if (typeof game !== "undefined" && typeof game.reset === "function") {
+            game.reset();
         }
 
         if (typeof player_me !== "undefined") {
