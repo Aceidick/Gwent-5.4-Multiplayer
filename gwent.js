@@ -2416,8 +2416,8 @@ class Row extends CardContainer {
         if (card.abilities.includes("inspire") && !card.isLocked()) {
             let inspires = card.holder.getAllRowCards().filter(c => !c.isLocked() && c.abilities.includes("inspire"));
             if (inspires.length > 1) {
-                let maxBase = inspires.reduce((a, b) => a.power > b.power ? a : b);
-                total = maxBase.power;
+                let maxBase = inspires.reduce((a, b) => a.basePower > b.basePower ? a : b);
+                total = maxBase.basePower * card.multiplier;
             }
         }
                 if (this.effects.weather)
@@ -2978,6 +2978,16 @@ class Game {
 
         weather.reset();
         board.row.forEach(r => r.reset());
+        // Clearing the rows above decremented the old players' totals via
+        // updateScore(); re-sync both score models and DOM displays to zero
+        // so a new game never starts with negative totals.
+        [player_me, player_op].forEach(p => {
+            if (!p)
+                return;
+            p.total = 0;
+            document.getElementById("score-total-" + p.tag).children[0].innerHTML = 0;
+            p.setWinning(false);
+        });
     }
 
     // Sets up player faction abilities and psasive leader abilities
