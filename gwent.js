@@ -77,8 +77,8 @@ class ControllerAI {
             }
             return;
         }
-        if (player.opponent().passed && (player.winning || player.deck.faction === "nilfgaard" && player.total === player.opponent().total)) {
-            nilfgaard_wins_draws = player.deck.faction === "nilfgaard" && player.total === player.opponent().total;
+        if (player.opponent().passed && (player.winning || (player.deck.faction === "nilfgaard" || player.deck.faction === "cintra_nilfgaard") && player.total === player.opponent().total)) {
+            nilfgaard_wins_draws = (player.deck.faction === "nilfgaard" || player.deck.faction === "cintra_nilfgaard") && player.total === player.opponent().total;
             await player.passRound();
             return;
         }
@@ -3207,8 +3207,8 @@ if (!noEffects)
         board.updateScores();
         let dif = player_me.total - player_op.total;
         if (dif === 0) {
-            let nilf_me = player_me.deck.faction === "nilfgaard",
-                nilf_op = player_op.deck.faction === "nilfgaard";
+            let nilf_me = (player_me.deck.faction === "nilfgaard" || player_me.deck.faction === "cintra_nilfgaard"),
+                nilf_op = (player_op.deck.faction === "nilfgaard" || player_op.deck.faction === "cintra_nilfgaard");
             dif = nilf_me ^ nilf_op ? nilf_me ? 1 : -1 : 0;
         }
         let winner = dif > 0 ? player_me : dif < 0 ? player_op : null;
@@ -5998,6 +5998,7 @@ document.getElementById("save-internal-deck").addEventListener("click", () => th
             index: cid
         })).filter(
             p => (([faction, "neutral", "weather", "special"].includes(p.card.deck) ||
+                (faction === "cintra_nilfgaard" && p.card.deck === "nilfgaard") ||
                 (["weather", "special"].includes(p.card.deck.split(" ")[0]) && p.card.deck.split(" ").includes(faction))) &&
                p.card.row !== "leader" && (!factions[faction] || !factions[faction].unavailableSpecials || !factions[faction].unavailableSpecials.includes(p.index))));
 
@@ -6555,6 +6556,7 @@ makePreview(index, num, container_elem, cards) {
                 return false
             }
             if (!([deck.faction, "neutral", "special", "weather"].includes(card.deck) ||
+                (deck.faction === "cintra_nilfgaard" && card.deck === "nilfgaard") ||
                 (["special", "weather"].includes(card.deck.split(" ")[0]) && card.deck.split(" ").includes(deck.faction)))) {
                 warning += "'" + card.name + "' cannot be used in a deck of faction type '" + deck.faction + "'\n";
                 return false;

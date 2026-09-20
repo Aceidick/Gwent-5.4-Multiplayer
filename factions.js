@@ -596,4 +596,4 @@ tocar("game_buy", false);
 			return Math.max(0, bestWeight);
 		}, unavailableSpecials: ["spe_scorch", "spe_horn", "spe_frost", "spe_rain", "spe_fog"]
 	}
-}
+,    cintra_nilfgaard: {        name: "Cintra/Nilfgaard",        description: "Wins any round that ends in a draw.",        activeAbility: false,        abilityUses: 0,        unavailableSpecials: []    }}
