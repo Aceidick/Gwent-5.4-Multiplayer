@@ -76,6 +76,10 @@
                     <button class="start-game_class play-mode-button" id="button_start_friend" type="button">Player vs Friend</button>
                 </div>
                 <div id="version_text">v5.0</div>
+                <label id="auto-fullscreen-toggle" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;font-size:0.8em;cursor:pointer;color:#e0b400;">
+                    <input type="checkbox" id="auto-fullscreen-checkbox" checked style="cursor:pointer;">
+                    <span>Auto fullscreen</span>
+                </label>
             </div>
         </div>
     </div>
@@ -204,6 +208,7 @@
 					<div></div>
 					<h1></h1>
 					<p></p>
+					<button class = "desc-close" type = "button" aria-label = "Close">&times;</button>
 				</div>
 			</section>
 			<section id = "carousel" class = "hide">
@@ -218,6 +223,7 @@
 					<div></div>
 					<h1></h1>
 					<p></p>
+					<button class = "desc-close" type = "button" aria-label = "Close">&times;</button>
 				</div>
 				<div id = "carousel_label"></div>
        			</section>
@@ -344,6 +350,8 @@
             <a id="download-json" style="display:none;"></a>
             <a id="select-op-deck" class="deck-options">Select Opponent Deck</a>
             <span id="op-deck-name" class="deck-options">Random deck</span>
+            <a id="select-op-leader" class="deck-options">Select Opponent Leader</a>
+            <span id="op-leader-name" class="deck-options">Normal</span>
             <h2 id="card-bank-title" class="card-contianer-title">Card Collection</h2>
             <h2 id="card-deck-title" class="card-contianer-title">Cards in Deck</h2>
             <div id="card-bank" class="card-array"></div>
@@ -404,7 +412,8 @@
     var playlist = [
         "audio/track1.mp3", "audio/track2.mp3", "audio/track3.mp3", "audio/track4.mp3",
         "audio/track5.mp3", "audio/track6.mp3", "audio/track7.mp3", "audio/track8.mp3",
-        "audio/track9.mp3", "audio/track10.mp3", "audio/track11.mp3", "audio/track12.mp3", "audio/track13.mp3"
+        "audio/track9.mp3", "audio/track10.mp3", "audio/track11.mp3", "audio/track12.mp3", "audio/track13.mp3",
+        "audio/track14.mp3", "audio/track15.mp3", "audio/track16.mp3", "audio/track17.mp3"
     ];
     var audio = document.getElementById('bgMusicLocal');
 

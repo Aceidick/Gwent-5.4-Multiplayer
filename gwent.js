@@ -524,6 +524,7 @@ class ControllerAI {
                 }
             }
             targ.decoyTarget = true;
+            targ.holder = this.player;
             await sleep(1000);
             await board.toHand(targ, row);
         } else {
@@ -538,7 +539,7 @@ class ControllerAI {
     }
 
 async cull(card, max, data) {
-		await this.playCull(card);
+		await this.player.playCull(card);
 	}
 
     // Tells the controlled Player to play the Scorch card
@@ -1431,10 +1432,9 @@ async playCull(card) {
             await this.endturn_action();
             return;
         }
-        if (!this.passed && !this.canPlay()) {
-            this.setPassed(true);
-            ui.notification("op-pass", 1200);
-        }
+        // Auto-passing a player who cannot act anymore is deferred to
+        // Game.endTurn so end-of-turn effects (e.g. Holger an Dimun:
+        // Blackhand's strength edit) are still offered after the last card.
         if (this === player_me) {
             document.getElementById("pass-button").classList.add("noclick");
             may_pass1 = false;
@@ -2241,8 +2241,8 @@ class Row extends CardContainer {
         }
         if (runEffect && this.effects.ambush) {
             let ambushCards = this.cards.filter(c => c.abilities.includes("ambush") &&
-                (c.holder !== card.holder && !card.abilities.includes("spy") && !card.abilities.includes("emissary")) ||
-                (c.holder === card.holder && (card.abilities.includes("spy") || card.abilities.includes("emissary")))); // Spy/Emissaries switch sides before being placed and would have triggerd when played by the owner of an ambush card
+                ((c.holder !== card.holder && !card.abilities.includes("spy") && !card.abilities.includes("emissary")) ||
+                (c.holder === card.holder && (card.abilities.includes("spy") || card.abilities.includes("emissary"))))); // Spy/Emissaries switch sides before being placed and would have triggerd when played by the owner of an ambush card
             if (ambushCards.length > 0 && ambushCards[0] !== card) {
                 let targetCard = ambushCards[0];
                 // Remove status first before animations to avoid triggering the ambush several times when several cards arrive at the same time
@@ -2281,6 +2281,8 @@ class Row extends CardContainer {
             card.locked = false;
         }
         this.updateState(card, false);
+        if (card.abilities.includes("ambush"))
+            this.effects.ambush = this.cards.some(c => c !== card && c.abilities.includes("ambush") && !c.isLocked());
         if (runEffect) {
             // Decoy targets do no trigger the removed effect, exept for cards holding a door opened, door closes when they leave the row
             if (!card.decoyTarget || card.abilities.includes("door_o")) {
@@ -2414,8 +2416,8 @@ class Row extends CardContainer {
         if (card.abilities.includes("inspire") && !card.isLocked()) {
             let inspires = card.holder.getAllRowCards().filter(c => !c.isLocked() && c.abilities.includes("inspire"));
             if (inspires.length > 1) {
-                let maxBase = inspires.reduce((a, b) => a.power > b.power ? a : b);
-                total = maxBase.power;
+                let maxBase = inspires.reduce((a, b) => a.basePower > b.basePower ? a : b);
+                total = maxBase.basePower * card.multiplier;
             }
         }
                 if (this.effects.weather)
@@ -2976,6 +2978,16 @@ class Game {
 
         weather.reset();
         board.row.forEach(r => r.reset());
+        // Clearing the rows above decremented the old players' totals via
+        // updateScore(); re-sync both score models and DOM displays to zero
+        // so a new game never starts with negative totals.
+        [player_me, player_op].forEach(p => {
+            if (!p)
+                return;
+            p.total = 0;
+            document.getElementById("score-total-" + p.tag).children[0].innerHTML = 0;
+            p.setWinning(false);
+        });
     }
 
     // Sets up player faction abilities and psasive leader abilities
@@ -3078,18 +3090,18 @@ tocar("coin", false);
                 if (player_me.leader.key === "sc_francesca_daisy") {
                     await ui.queueCarousel(player_me.hand, myCount, async (c, i) => player_me.deck.addCard(c.removeCard(i)), c => true, true, false, "Player 1 - Choose " + myCount +" cards to put back to deck.", true);
                 } else {
-                    await ui.queueCarousel(player_me.hand, myCount, async (c, i) => await player_me.deck.swap(c, c.removeCard(i)), c => true, true, true, "Player 1 - Choose up to " + myCount +" cards to redraw.");
+                    await ui.queueCarousel(player_me.hand, myCount, async (c, i) => await player_me.deck.swap(c, c.removeCard(i)), c => true, true, true, "Player 1 - Choose up to " + myCount +" cards to redraw.", true);
                 }
                 if (player_op.leader.key === "sc_francesca_daisy") {
                     await ui.queueCarousel(player_op.hand, opCount, async (c, i) => player_op.deck.addCard(c.removeCard(i)), c => true, true, false, "Player 2 - Choose " + opCount +" cards to put back to deck.", true);
                 } else {
-                    await ui.queueCarousel(player_op.hand, opCount, async (c, i) => await player_op.deck.swap(c, c.removeCard(i)), c => true, true, true, "Player 2 - Choose up to " + opCount +" cards to redraw.");
+                    await ui.queueCarousel(player_op.hand, opCount, async (c, i) => await player_op.deck.swap(c, c.removeCard(i)), c => true, true, true, "Player 2 - Choose up to " + opCount +" cards to redraw.", true);
                 }
             } else {
                 if (player_me.leader.key === "sc_francesca_daisy") {
                     await ui.queueCarousel(player_me.hand, myCount, async (c, i) => player_me.deck.addCard(c.removeCard(i)), c => true, true, false, "Choose " + myCount +" cards to put back to deck.", true);
                 } else {
-                    await ui.queueCarousel(player_me.hand, myCount, async (c, i) => await player_me.deck.swap(c, c.removeCard(i)), c => true, true, true, "Choose up to " + myCount +" cards to redraw.");
+                    await ui.queueCarousel(player_me.hand, myCount, async (c, i) => await player_me.deck.swap(c, c.removeCard(i)), c => true, true, true, "Choose up to " + myCount +" cards to redraw.", true);
                 }
             }
             ui.enablePlayer(false);
@@ -3163,6 +3175,12 @@ tocar("coin", false);
 
 if (!noEffects)
             await this.runEffects(this.turnEnd);
+        // Auto-pass after end-of-turn effects so abilities such as Holger an
+        // Dimun: Blackhand are still offered when the last card was played.
+        if (!this.currPlayer.passed && !this.currPlayer.canPlay()) {
+            this.currPlayer.setPassed(true);
+            ui.notification("op-pass", 1200);
+        }
         // Player might have "end turn" events which delay the actual end of the turn
         if (this.currPlayer.endturn_action) {
             // Call action instead of ending turn
@@ -3182,14 +3200,10 @@ if (!noEffects)
     async endRound() {
         limpar();
 
-        // Clean and update scores
-        board.row.forEach(r => {
-            r.cards.forEach(c => {
-                if (c.temporaryPower)
-                    c.basePower = c.originalBasePower;
-            });
-            r.updateScore();
-        });
+        // Update scores with the current card strengths, including leader-edited
+        // temporary values (e.g. Holger an Dimun: Blackhand), which must count
+        // toward the round score before reverting.
+        board.row.forEach(r => r.updateScore());
         board.updateScores();
         let dif = player_me.total - player_op.total;
         if (dif === 0) {
@@ -3204,6 +3218,16 @@ if (!noEffects)
             score_op: player_op.total
         }
         this.roundHistory.push(verdict);
+        // Leader-edited strengths (e.g. Holger an Dimun: Blackhand) only count
+        // toward the round scoring above; revert them before the board is
+        // cleared so carried-over and future rounds use the original value.
+        board.row.forEach(r => r.cards.forEach(c => {
+            if (c.temporaryPower) {
+                c.basePower = c.originalBasePower;
+                c.originalBasePower = null;
+                c.temporaryPower = false;
+            }
+        }));
 
         await this.runEffects(this.roundEnd);
 
@@ -3294,9 +3318,9 @@ if (canVibrate) navigator.vibrate(1000);
     // Returns the client to the deck customization screen
     returnToCustomization() {
         iniciarMusica();
-        this.reset();
         player_me.reset();
         player_op.reset();
+        this.reset();
         ui.toggleMusic_elem.classList.add("music-customization");
 actualizarPosicionMusicaMovel();
         this.endScreen.classList.add("hide");
@@ -3826,6 +3850,12 @@ class UI {
         this.carousels = [];
         this.notif_elem = document.getElementById("notification-bar");
         this.preview = document.getElementsByClassName("card-preview")[0];
+        for (const closeBtn of document.querySelectorAll(".card-description .desc-close")) {
+            closeBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                this.parentElement.classList.add("hide");
+            }, false);
+        }
         this.previewCard = null;
         this.lastRow = null;
         this.underRearrangement = false;
@@ -3854,14 +3884,14 @@ if (giveupBtn) {
         tocar("pass", false);
 
         limpar();
-        if (typeof game !== "undefined" && typeof game.reset === "function") {
-            game.reset();
-        }
         if (typeof player_me !== "undefined" && typeof player_me.reset === "function") {
             player_me.reset();
         }
         if (typeof player_op !== "undefined" && typeof player_op.reset === "function") {
             player_op.reset();
+        }
+        if (typeof game !== "undefined" && typeof game.reset === "function") {
+            game.reset();
         }
 
         if (typeof player_me !== "undefined") {
@@ -3960,14 +3990,14 @@ if (giveupBtnMobile) {
         tocar("pass", false);
 
         limpar();
-        if (typeof game !== "undefined" && typeof game.reset === "function") {
-            game.reset();
-        }
         if (typeof player_me !== "undefined" && typeof player_me.reset === "function") {
             player_me.reset();
         }
         if (typeof player_op !== "undefined" && typeof player_op.reset === "function") {
             player_op.reset();
+        }
+        if (typeof game !== "undefined" && typeof game.reset === "function") {
+            game.reset();
         }
 
         if (typeof player_me !== "undefined") {
@@ -4370,6 +4400,7 @@ let row = this.lastRow;
             this.hidePreview(card);
             this.enablePlayer(false);
             card.decoyTarget = true;
+            card.holder = pCard.holder;
             await board.toHand(card, row);
             await board.moveTo(pCard, row, pCard.holder.hand);
             await pCard.holder.endTurn();
@@ -4418,6 +4449,11 @@ let row = this.lastRow;
             return; // If a unit can be selected, we cannot select the whole row
         let card = this.previewCard;
         let holder = card.holder;
+        if ((card.isUnit() || card.hero) && !card.abilities.includes("ambush")) {
+            let currRows = card.row.includes("agile") ? board.getAgileRows(card, card.holder) : [board.getRow(card, card.row, card.holder)];
+            if (!currRows.includes(row))
+                return; // Units and heroes can only be placed on their own valid rows
+        }
         this.hidePreview();
         this.enablePlayer(false);
         if (card.faction === "special" && card.abilities.includes("scorch")) {
@@ -4627,7 +4663,7 @@ navigator.vibrate(50);
             "notif-skellige-op": "Opponent Skellige Ability Triggered!",
             "notif-skellige-me": "Skellige Ability Triggered!",
             "notif-witcher_universe": "Witcher Universe used its faction ability and skipped a turn",
-            "notif-toussaint": "Toussaint faction ability triggered - Toussaint draws an additional card.",
+            "notif-toussaint": "Toussaint faction ability used - a Monster of Toussaint transformed into its stronger form.",
             "notif-toussaint-decoy-cancelled": "Toussaint Leader ability used - Decoy ability cancelled for the rest of the round.",
             "notif-lyria_rivia": "Lyria & Rivia ability used - Morale Boost effect applied to a row.",
             "notif-meve_white_queen": "Lyria & Rivia leader allows both players to restore 2 units when using the medic ability.",
@@ -4695,13 +4731,24 @@ navigator.vibrate(50);
     // Displays a Carousel menu of filtered container items that match the predicate.
     // Suspends gameplay until the Carousel is closed. Automatically picks random card if activated for AI player
     async queueCarousel(container, count, action, predicate, bSort, bQuit, title, bRedraw = false) {
-        /*if (game.currPlayer && game.currPlayer.controller instanceof ControllerAI) {
-            for (let i = 0; i < count; ++i) {
-                let cards = container.cards.reduce((a, c, i) => !predicate || predicate(c) ? a.concat([i]) : a, []);
-                await action(container, cards[randomInt(cards.length)]);
+        // Offline AI decisions: when the chooser is a ControllerAI (player vs
+        // computer / AI vs AI), the carousel has no human to drive it. Left to
+        // its own devices Carousel.completion never resolves and the game
+        // freezes. Auto-pick weighted candidates instead. Online mode wraps
+        // queueCarousel separately, so this branch only fires offline.
+        const chooser = game.currPlayer;
+        if (chooser && chooser.controller instanceof ControllerAI &&
+            !(window.GwentOnline && GwentOnline.active)) {
+            let indices = container.cards.reduce((a, c, i) => (!predicate || predicate(c)) ? a.concat([i]) : a, []);
+            let picks = Math.min(count, indices.length);
+            for (let i = 0; i < picks; ++i) {
+                if (indices.length === 0) break;
+                let pick = indices[randomInt(indices.length)];
+                indices = indices.filter(idx => idx !== pick);
+                await action(container, pick);
             }
             return;
-        }*/
+        }
         let carousel = new Carousel(container, count, action, predicate, bSort, bQuit, title, bRedraw);
         if (Carousel.curr === undefined || Carousel.curr === null) {
             carousel.start();
@@ -5094,6 +5141,7 @@ navigator.vibrate(50);
                 row.elem.classList.add("row-selectable");
             } else {
                 row.elem.classList.add("noclick");
+                row.special.elem.classList.add("noclick");
             }
         }
 
@@ -5693,6 +5741,12 @@ class DeckMaker {
         this.leader_elem.children[1].addEventListener("mouseout", function () {
             this.style.boxShadow = "0 0 0 #6d5210"
         });
+        this.leader_elem.children[1].addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.viewLeader();
+            return false;
+        }, false);
 
         this.faction = "realms";
         this.setFaction(this.faction, true);
@@ -5709,6 +5763,7 @@ class DeckMaker {
         this.start_op_deck;
         this.me_deck_index = 0;
         this.op_deck_index = 0;
+        this.op_leader_choice = "normal";
 
         this.change_elem = document.getElementById("change-faction");
         this.change_elem.addEventListener("click", () => this.selectFaction(), false);
@@ -5825,6 +5880,8 @@ if (toggleBtn) {
 
         document.getElementById("select-deck").addEventListener("click", () => this.selectDeck(), false);
         document.getElementById("select-op-deck").addEventListener("click", () => this.selectOPDeck(), false);
+        document.getElementById("select-op-leader").addEventListener("click", () => this.selectOPLeader(), false);
+        document.getElementById("op-leader-name").addEventListener("click", () => this.rerollOPLeader(), false);
         document.getElementById("download-deck").addEventListener("click", () => this.downloadDeck(), false);
         document.getElementById("add-file").addEventListener("change", () => this.uploadDeck(), false);
 document.getElementById("save-internal-deck").addEventListener("click", () => this.saveDeckInternal(), false);
@@ -6105,6 +6162,7 @@ makePreview(index, num, container_elem, cards) {
 
     // Opens a Carousel to allow the client to select a leader for their deck
     selectLeader() {
+        if (this.leader_elem && this.leader_elem.classList.contains("leader-locked")) return;
         let container = new CardContainer();
         container.cards = this.leaders.map(c => {
             let card = new Card(c.index, c.card, player_me);
@@ -6120,6 +6178,20 @@ makePreview(index, num, container_elem, cards) {
         }, () => true, false, true);
         Carousel.curr.index = index;
         Carousel.curr.update();
+    }
+
+    // View-only: opens a Carousel showing the current leader (and its ability)
+    // without allowing it to be changed. Used by the right-click handler when
+    // the leader is locked (Random Leader mode) so a player can still inspect
+    // the leader ability.
+    viewLeader() {
+        if (!this.leader || !this.leader.card) return;
+        let container = new CardContainer();
+        let card = new Card(this.leader.index, this.leader.card, player_me);
+        card.data = this.leader;
+        container.cards = [card];
+        ui.viewCardsInContainer(container);
+        if (Carousel.curr) { Carousel.curr.index = 0; Carousel.curr.update(); }
     }
 
        // Opens a Carousel to allow the client to select a faction for their deck
@@ -6333,6 +6405,57 @@ makePreview(index, num, container_elem, cards) {
         }, () => true, false, true);
         Carousel.curr.index = this.op_deck_index;
         Carousel.curr.update();
+    }
+
+    // Friend-mode only: lets a player choose how the opponent's leader is set.
+    // "Random Leader" locks the opponent's leader+faction to a seeded random
+    // pick (deterministic across both peers); "Normal" lets the opponent pick
+    // their leader+faction freely. Each player's choice applies to the OTHER
+    // player. Only the deck composition stays editable under Random Leader.
+    selectOPLeader() {
+        let container = new CardContainer();
+        container.cards = [
+            {
+                abilities: [],
+                name: "Normal",
+                row: "leader",
+                filename: "normal",
+                desc_name: "Normal",
+                desc: "<p>Opponent chooses their own leader and faction freely.</p>",
+                faction: "faction"
+            },
+            {
+                abilities: [],
+                name: "Random Leader",
+                row: "leader",
+                filename: "random",
+                desc_name: "Random Leader",
+                desc: "<p>Opponent's leader and faction are chosen at random (locked). Opponent may still build their deck freely.</p>",
+                faction: "faction"
+            }
+        ];
+        const cur = (this.op_leader_choice === "random") ? 1 : 0;
+        ui.queueCarousel(container, 1, (c, i) => {
+            this.op_leader_choice = (i === 1) ? "random" : "normal";
+            const opNameEl = document.getElementById("op-leader-name");
+            if (opNameEl) {
+                opNameEl.innerHTML = this.op_leader_choice === "random" ? "Random Leader" : "Normal";
+                opNameEl.classList.toggle("rerollable", this.op_leader_choice === "random");
+            }
+            if (window.GwentOnline && typeof window.GwentOnline.onOpLeaderChoice === "function")
+                window.GwentOnline.onOpLeaderChoice(this.op_leader_choice);
+        }, () => true, false, true);
+        Carousel.curr.index = cur;
+        Carousel.curr.update();
+    }
+
+    // Re-randomize the opponent's leader. Only active when this player has
+    // already chosen "Random Leader"; clicking the "Random Leader" text under
+    // Select Opponent Leader re-rolls the seeded random pick for the peer.
+    rerollOPLeader() {
+        if (this.op_leader_choice !== "random") return;
+        if (window.GwentOnline && typeof window.GwentOnline.rerollOpLeader === "function")
+            window.GwentOnline.rerollOpLeader();
     }
 
     // Called by the client to downlaod the current deck as a JSON file
@@ -7337,7 +7460,15 @@ document.onkeydown = function (e) {
 
 var elem_principal = document.documentElement;
 
+function autoFullscreenEnabled() {
+    try {
+        var v = localStorage.getItem("gwent-auto-fullscreen");
+        return v === null ? true : v === "true";
+    } catch (e) { return true; }
+}
+
 async function openFullscreen() {
+    if (!autoFullscreenEnabled()) return;
     try {
         if (elem_principal.requestFullscreen) elem_principal.requestFullscreen();
         else if (elem_principal.webkitRequestFullscreen) elem_principal.webkitRequestFullscreen();
@@ -7470,6 +7601,13 @@ var iniciou = false,
 var playingOnline;
 
 window.onload = function () {
+    var fsCheckbox = document.getElementById("auto-fullscreen-checkbox");
+    if (fsCheckbox) {
+        fsCheckbox.checked = autoFullscreenEnabled();
+        fsCheckbox.addEventListener("change", function () {
+            try { localStorage.setItem("gwent-auto-fullscreen", String(fsCheckbox.checked)); } catch (e) { }
+        });
+    }
     dimensionar();
     playingOnline = window.location.href == "https://randompianist.github.io/gwent-classic-v2.0/";
     document.getElementById("load_text").style.display = "none";
