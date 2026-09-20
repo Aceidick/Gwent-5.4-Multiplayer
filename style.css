@@ -579,6 +579,26 @@ border-radius: 0.5vw;
 	height: 50%;
 	font-size: .9vw;
 }
+.card-description .desc-close {
+	position: absolute;
+	top: .2vw;
+	right: .2vw;
+	width: 1.4vw;
+	height: 1.4vw;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: rgba(255, 255, 255, .65);
+	font-size: 1.1vw;
+	line-height: 1.4vw;
+	text-align: center;
+	cursor: pointer;
+	pointer-events: auto;
+}
+.card-description .desc-close:hover {
+	color: #fff;
+	text-shadow: 0 0 .3vw #ffffff88;
+}
 
 #carousel {
 	position: absolute;

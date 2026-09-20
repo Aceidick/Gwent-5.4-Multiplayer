@@ -3840,6 +3840,12 @@ class UI {
         this.carousels = [];
         this.notif_elem = document.getElementById("notification-bar");
         this.preview = document.getElementsByClassName("card-preview")[0];
+        for (const closeBtn of document.querySelectorAll(".card-description .desc-close")) {
+            closeBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                this.parentElement.classList.add("hide");
+            }, false);
+        }
         this.previewCard = null;
         this.lastRow = null;
         this.underRearrangement = false;
