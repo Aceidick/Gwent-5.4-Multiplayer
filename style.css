@@ -452,7 +452,7 @@ html {
 }
 
 #notif-toussaint::after{
-	content: "Toussaint faction ability used: \A Toussaint draws an additional card.";
+	content: "Toussaint faction ability used: \A A Monster of Toussaint transformed into its stronger form.";
 }
 
 #notif-toussaint-decoy-cancelled::after {
@@ -578,6 +578,26 @@ border-radius: 0.5vw;
 	width: 90%;
 	height: 50%;
 	font-size: .9vw;
+}
+.card-description .desc-close {
+	position: absolute;
+	top: .2vw;
+	right: .2vw;
+	width: 1.4vw;
+	height: 1.4vw;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: rgba(255, 255, 255, .65);
+	font-size: 1.1vw;
+	line-height: 1.4vw;
+	text-align: center;
+	cursor: pointer;
+	pointer-events: auto;
+}
+.card-description .desc-close:hover {
+	color: #fff;
+	text-shadow: 0 0 .3vw #ffffff88;
 }
 
 #carousel {
@@ -1683,6 +1703,25 @@ font-weight: bold;
 	font-style: italic;
 }
 
+#select-op-leader {
+	left: 56%;
+}
+
+#op-leader-name {
+	left: 56%;
+	top: 16.9%;
+	color: #cccccc;
+	font-style: italic;
+}
+
+#op-leader-name.rerollable {
+	cursor: pointer;
+	text-decoration: underline;
+}
+#op-leader-name.rerollable:hover {
+	color: #e0b400;
+}
+
 #site-links {
     right: 5%;
     top: 5%;
@@ -2501,6 +2540,16 @@ color: #b48c44 !important;
 	pointer-events: none;
 }
 
+/* Random Leader lock: block left-click selection but keep right-click
+   (contextmenu) inspection of the leader ability working. */
+#card-leader.leader-locked {
+	opacity: 0.65;
+	cursor: not-allowed;
+}
+#card-leader.leader-locked > div {
+	cursor: context-menu;
+}
+
 /*
     DECK SORTER
 */
@@ -2890,6 +2939,8 @@ body[data-play-mode="computer"] #start-pvp-game { display: none !important; }
 body[data-play-mode="friend"] #start-pvp-game { display: block; }
 body[data-play-mode="friend"] #select-op-deck,
 body[data-play-mode="friend"] #op-deck-name { display: none !important; }
+body[data-play-mode="computer"] #select-op-leader,
+body[data-play-mode="computer"] #op-leader-name { display: none !important; }
 
 /* Keep the two Friend-mode actions visually together after removing legacy AI/hotseat buttons. */
 body[data-play-mode="friend"] #start-pvp-game { top: 90.5%; left: 44.9%; }
