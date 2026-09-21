@@ -1,6 +1,6 @@
 "use strict";
 
-console.log("[Gwent Online] online.js loaded v1.4.3-choice-audit");
+console.log("[Gwent Online] online.js loaded v1.4.4-pvp-desync-fix");
 
 /*
  * Gwent Classic v5.0 online layer.
@@ -134,6 +134,23 @@ const GwentOnline = {
     const prev = this.rngScope;
     this.rngScope = role;
     try { return fn(); } finally { this.rngScope = prev; }
+  },
+
+  // Private-zone shuffles whose result is exchanged via snapshot instead of
+  // being replayed on the peer must not advance the seeded RNG streams.
+  withLocalShuffleRng(fn) {
+    const prev = this.rngScope;
+    const prevGameRng = this.gameRng;
+    const prevDeckRng = this.deckRng;
+    this.rngScope = null;
+    this.gameRng = null;
+    this.deckRng = {host:null, guest:null};
+    try { return fn(); }
+    finally {
+      this.rngScope = prev;
+      this.gameRng = prevGameRng;
+      this.deckRng = prevDeckRng;
+    }
   },
 
   cardToWire(card, hand) {
@@ -1590,7 +1607,7 @@ const GwentOnline = {
         };
         let m;
         try {
-          m = await self.nextMatchingWithTimeout('destination', x => x.decision === decision.id, 30000,
+          m = await self.nextMatchingWithTimeout('destination', x => x.decision === decision.id, 120000,
             `Timed out waiting for continuation destination (${decision.id})`);
         } catch (e) {
           self.trace('decision:destination-timeout', {actor:decision.role, card:card?.key || null, err:decision.id});
@@ -1657,7 +1674,7 @@ const GwentOnline = {
         self.trace('decision:popup-wait', {actor:decision.role, err:decision.id});
         let m;
         try {
-          m = await self.nextMatchingWithTimeout('popup-choice', x => x.decision === decision.id, 30000, `Timed out waiting for popup choice (${decision.id})`);
+          m = await self.nextMatchingWithTimeout('popup-choice', x => x.decision === decision.id, 120000, `Timed out waiting for popup choice (${decision.id})`);
         } catch (e) {
           self.trace('decision:popup-timeout', {actor:decision.role, err:decision.id});
           return self.desync(e.message);
@@ -1665,8 +1682,9 @@ const GwentOnline = {
         self.trace('decision:popup-recv', {actor:decision.role, err:decision.id});
         const fake = {choice:null};
         const fn = m.yes ? yes : no;
-        if (typeof fn === 'function') { const r = fn(fake); if (r && typeof r.then === 'function') await r; }
-        return fake.choice;
+        let returned;
+        if (typeof fn === 'function') { returned = fn(fake); if (returned && typeof returned.then === 'function') returned = await returned; }
+        return fake.choice !== null && fake.choice !== undefined ? fake.choice : returned;
       }
       if (chooser === player_me) {
         const y = async p => { self.trace('decision:popup-send', {actor:decision.role, err:decision.id + ':yes'}); self.send({t:'popup-choice', decision:decision.id, yes:true}); return yes && yes(p); };
@@ -2001,7 +2019,7 @@ const GwentOnline = {
         while (true) {
           let m;
           try {
-            m = await self.nextMatchingWithTimeout(["choice", "choice-commit", "choice-end"], x => x.decision === decision.id, 30000, `Timed out waiting for carousel choice (${decision.id})`);
+            m = await self.nextMatchingWithTimeout(["choice", "choice-commit", "choice-end"], x => x.decision === decision.id, 120000, `Timed out waiting for carousel choice (${decision.id})`);
           } catch (e) {
             self.trace('decision:carousel-timeout', {actor:decision.role, err:decision.id});
             return self.desync(e.message);
@@ -2045,7 +2063,7 @@ const GwentOnline = {
           await action(resolved.container, index);
         }
         if (!receivedEnd) await self.nextMatchingWithTimeout('choice-end', x => x.decision === decision.id,
-          30000, 'Timed out waiting for carousel completion (' + decision.id + ')');
+          120000, 'Timed out waiting for carousel completion (' + decision.id + ')');
         self.trace('decision:carousel-commit', {actor:decision.role, err:decision.id + ':count=' + pendingChoices.length});
         return;
       }
@@ -2117,14 +2135,20 @@ const GwentOnline = {
       const card = c?.cards?.[i];
       if (!card) return this.desync(`Mulligan selected a missing card for ${role}`);
       this.trace('mulligan:pick', {actor:role, card:card.key, pick:++pickNo, count, handBefore:c.cards.length, deckBefore:p.deck.cards.length});
+      // The opening mulligan must not consume the seeded deckRng stream. Both
+      // peers run their own private redraw concurrently; each consume of the
+      // shared stream is local-only, so the two streams diverge from turn one
+      // and every later seeded shuffle (e.g. Zirael putting cards back into
+      // the deck) yields different card orders on the two browsers. The exact
+      // post-mulligan hand/deck order is already exchanged authoritatively via
+      // the mulligan-state snapshot, so a non-seeded shuffle is safe here.
       if (daisy) {
         // Daisy is a return-to-deck, not a redraw. Remove it from the hand
         // synchronously so the carousel can never offer/click the same card
-        // again while a movement animation is still running. Deck.addCard()
-        // performs the actual randomized shuffle under the owner's RNG scope.
-        await this.withDeckRng(role, () => p.deck.addCard(c.removeCard(i)));
+        // again while a movement animation is still running.
+        await this.withLocalShuffleRng(() => p.deck.addCard(c.removeCard(i)));
       } else {
-        await this.withDeckRng(role, () => p.deck.swap(c, c.removeCard(i)));
+        await this.withLocalShuffleRng(() => p.deck.swap(c, c.removeCard(i)));
       }
       this.trace('mulligan:pick-applied', {actor:role, card:card.key, pick:pickNo, count, handAfter:c.cards.length, deckAfter:p.deck.cards.length});
     };

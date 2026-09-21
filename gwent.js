@@ -3252,7 +3252,7 @@ if (!noEffects)
             this.over = true;
 
         await weather.clearWeather();
-               await Promise.all(board.row.map(async row => {
+               for (const row of board.row) {
             if (row) {
                 if (row.effects) {
                     row.effects.weather = false;
@@ -3270,7 +3270,7 @@ if (!noEffects)
             row.cards.forEach(c => {
                 c.power = c.basePower;
             });
-        }));
+        }
 		const canVibrate = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 
         if (dif > 0) {

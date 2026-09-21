@@ -1,3 +1,9 @@
+# v1.4.4 — Falske desync-stop i Player vs Friend rettet
+
+Se `docs/PVP_DESYNC_FIX_V1.4.4_DA.md`. Bevar serverens eksisterende `img`-mappe.
+
+---
+
 # v1.4.3 — Audit af spillets valgforløb
 
 Se `docs/CHOICE_AUDIT_V1.4.3_DA.md`. Bevar serverens eksisterende `img`-mappe.
