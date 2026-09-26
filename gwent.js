@@ -2270,8 +2270,10 @@ class Row extends CardContainer {
                 await targetCard.animate("ambush");
                 await targetCard.holder.deck.draw(targetCard.holder.hand);
                 await targetCard.holder.deck.draw(targetCard.holder.hand);
-                // Cards goes to the grave
-                await board.toGrave(targetCard, targetCard.currentLocation);
+                // The ambush resolving discards itself - that is not a unit death,
+                // so death-prevention effects (Sigismund Dijkstra) and
+                // unit-destroyed hooks must not apply.
+                await board.moveTo(targetCard, "grave", targetCard.currentLocation);
                 
             }
         }
@@ -2744,7 +2746,7 @@ class Board {
         let protectors = null;
         if (card.isUnit() && source instanceof Row) {
 
-                if (card && card.holder && 
+                if (!turnEnd && card && card.holder && 
                 card.holder.leader && card.holder.leader.abilities && 
                 card.holder.leader.abilities.includes("novigrad_sigismund") &&
                 !card.holder.sigismundDeathPreventionUsed &&
