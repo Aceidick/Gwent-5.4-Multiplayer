@@ -4684,7 +4684,7 @@ navigator.vibrate(50);
             "notif-meve_white_queen": "Lyria & Rivia leader allows both players to restore 2 units when using the medic ability.",
             "notif-north-scorch-cancelled": "Northern Realms Leader ability used - Scorch ability cancelled for the rest of the round.",
             "notif-zerrikania": "Zerrikania ability used - Unit restored from discard pile.",
-"notif-ofir": "Ofir faction ability used - Weather card played from deck.",
+"notif-ofir": "Ofir faction ability used - Weather card played from deck.",            "notif-trade-no-runestone": "Trade failed: no runestone left in your deck to pay with.",
 "notif-novigrad-sigismund": "Sigismund Dijkstra prevented the death of a friendly unit.",
             "notif-redania": "Redania used its faction ability and skipped a turn",
             "notif-velen": "Velen ability triggered: Player will draw a card"

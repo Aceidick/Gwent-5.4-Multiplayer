@@ -3107,6 +3107,8 @@ omen: {
             let myRunes = player.deck.cards.filter(c => c && c.key && runeKeys.includes(c.key));
             
             if (!myRunes || myRunes.length === 0) {
+                if (typeof ui !== "undefined" && ui.notification && !(player.controller instanceof ControllerAI))
+                    await ui.notification("trade-no-runestone", 2000);
                 return; 
             }
             
