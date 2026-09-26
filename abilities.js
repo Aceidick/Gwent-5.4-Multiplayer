@@ -1938,8 +1938,7 @@ eredin_commander: {
             } else {
                 await ui.queueCarousel(board.getRow(card, "hand", card.holder), 1, (c, i) => wrapper.card = c.cards[i], c => c.isUnit(), true);
             }
-            await wrapper.card.autoplay();
-            card.holder.hand.removeCard(wrapper.card);
+            await wrapper.card.autoplay(card.holder.hand);
             if (card.holder.deck.cards.length > 0)
                 await card.holder.deck.draw(card.holder.hand);
         },
