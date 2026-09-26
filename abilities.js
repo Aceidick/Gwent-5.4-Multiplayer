@@ -1938,8 +1938,7 @@ eredin_commander: {
             } else {
                 await ui.queueCarousel(board.getRow(card, "hand", card.holder), 1, (c, i) => wrapper.card = c.cards[i], c => c.isUnit(), true);
             }
-            await wrapper.card.autoplay();
-            card.holder.hand.removeCard(wrapper.card);
+            await wrapper.card.autoplay(card.holder.hand);
             if (card.holder.deck.cards.length > 0)
                 await card.holder.deck.draw(card.holder.hand);
         },
@@ -3108,6 +3107,8 @@ omen: {
             let myRunes = player.deck.cards.filter(c => c && c.key && runeKeys.includes(c.key));
             
             if (!myRunes || myRunes.length === 0) {
+                if (typeof ui !== "undefined" && ui.notification && !(player.controller instanceof ControllerAI))
+                    await ui.notification("trade-no-runestone", 2000);
                 return; 
             }
             
@@ -3246,13 +3247,14 @@ ofiri_envoy: {
                     player_me.deck.draw = async function(hand) {
                         const result = await originalDrawMe(hand);
                         player_me.aamadBonus = (player_me.aamadBonus || 0) + 1;
-                        player_me.total += 1;
-                        if (typeof board !== "undefined" && board.updateLeader) board.updateLeader();
-                        else if (player_me.updateTotal) player_me.updateTotal(0);
+                        if (typeof player_me.updateTotal === "function") player_me.updateTotal(1);
+                        else player_me.total += 1;
+                        updateAamadCounterUI(player_me, true);
                         return result;
                     };
                     player_me.deck.draw._isPatched = true; // Candado anti-duplicación
                 }
+                updateAamadCounterUI(player_me, false);
             }
 
             if (player_op && player_op.leader && player_op.leader.abilities && player_op.leader.abilities.includes("ofir_aamad")) {
@@ -3263,24 +3265,29 @@ ofiri_envoy: {
                     player_op.deck.draw = async function(hand) {
                         const result = await originalDrawOp(hand);
                         player_op.aamadBonus = (player_op.aamadBonus || 0) + 1;
-                        player_op.total += 1;
-                        if (typeof board !== "undefined" && board.updateLeader) board.updateLeader();
-                        else if (player_op.updateTotal) player_op.updateTotal(0);
+                        if (typeof player_op.updateTotal === "function") player_op.updateTotal(1);
+                        else player_op.total += 1;
+                        updateAamadCounterUI(player_op, true);
                         return result;
                     };
                     player_op.deck.draw._isPatched = true; // Candado anti-duplicación
                 }
+                updateAamadCounterUI(player_op, false);
             }
             
             game.roundStart.push(async () => {
                 if (player_me && player_me.aamadBonus && player_me.aamadBonus > 0) {
-                    player_me.total -= player_me.aamadBonus;
+                    if (typeof player_me.updateTotal === "function") player_me.updateTotal(-player_me.aamadBonus);
+                    else player_me.total -= player_me.aamadBonus;
                     player_me.aamadBonus = 0;
                 }
                 if (player_op && player_op.aamadBonus && player_op.aamadBonus > 0) {
-                    player_op.total -= player_op.aamadBonus;
+                    if (typeof player_op.updateTotal === "function") player_op.updateTotal(-player_op.aamadBonus);
+                    else player_op.total -= player_op.aamadBonus;
                     player_op.aamadBonus = 0;
                 }
+                updateAamadCounterUI(player_me, false);
+                updateAamadCounterUI(player_op, false);
                 if (typeof board !== "undefined" && board.updateLeader) {
                     board.updateLeader();
                 }
@@ -4570,3 +4577,20 @@ novigrad_sigismund: {
 		}
 	},
 };
+
+// Updates the "Aamad, the Wise" bonus counter badge next to the player's total
+// score. The badge is only visible while the leader ability has accumulated a
+// round bonus, so players can see the passive ability is active.
+function updateAamadCounterUI(player, animate) {
+    if (typeof document === "undefined" || !player || !player.tag) return;
+    const badge = document.getElementById("aamad-bonus-" + player.tag);
+    if (!badge) return;
+    const bonus = player.aamadBonus || 0;
+    badge.innerHTML = "+" + bonus;
+    badge.classList.toggle("hide", bonus <= 0);
+    if (animate && bonus > 0) {
+        badge.classList.remove("aamad-bonus-pulse");
+        void badge.offsetWidth;
+        badge.classList.add("aamad-bonus-pulse");
+    }
+}
