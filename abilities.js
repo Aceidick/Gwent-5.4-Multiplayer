@@ -548,7 +548,17 @@ dragon_wrath: {
                 grave.removeCard(res);
                 grave.addCard(res);
                 await res.animate("medic");
-                await res.autoplay(grave);
+                // Cards with several valid rows (agile variants) must let the
+                // player choose the destination. Single-row cards keep the
+                // previous automatic placement. selectCardDestination
+                // highlights every valid row, is online-aware and its callback
+                // resolves once the row choice has committed, so multiple medic
+                // picks (medicCount) resolve in order.
+                if (board.getAgileRows(res, card.holder).length > 1) {
+                    await new Promise(resolve => card.holder.selectCardDestination(res, grave, resolve));
+                } else {
+                    await res.autoplay(grave);
+                }
             });
         }
     },

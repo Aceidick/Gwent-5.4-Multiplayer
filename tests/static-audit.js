@@ -251,7 +251,7 @@ ok(online.includes("self._continuationCard === card && self._continuationDecisio
 ok(abilities.includes("await card.holder.opponent().selectCardDestination") && abilities.includes("await card.holder.selectCardDestination"), 'Emhyr Invader awaits both opponent and own restored-card destinations');
 ok(!abilities.slice(abilities.indexOf('emhyr_invader:'), abilities.indexOf('eredin_bringer_of_death:')).includes('endturn_action'), 'Emhyr Invader no longer uses detached nested endturn_action choreography');
 const continuationSources = abilities + '\n' + factions;
-ok(!/(^|\n)\s*(?:card\.holder|player)\.selectCardDestination\(/m.test(continuationSources), 'audited ability/faction destination continuations are all awaited');
+ok(!/(^|\n)\s*(?!await\s+new Promise)(?:card\.holder|player)\.selectCardDestination\(/m.test(continuationSources), 'audited ability/faction destination continuations are all awaited');
 ok(abilities.includes('await resolveInOrder(op_spies,') && abilities.includes('await resolveInOrder(targetCards,'), 'audit removes detached async collection moves in affected abilities');
 const contAuditDoc = fs.readFileSync(path.join(root, 'docs', 'CONTINUATION_AUDIT_V1.3.9.md'), 'utf8');
 ok(contAuditDoc.includes('Emhyr') && contAuditDoc.includes('decision owner') && contAuditDoc.includes('leader preview'), 'v1.3.9 audit documents the full continuation failure class');
