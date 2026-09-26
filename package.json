@@ -1,6 +1,6 @@
 {
   "name": "gwent-classic-v5-online",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "description": "Gwent Classic v5.0 with integrated single-port online multiplayer",
   "scripts": {
