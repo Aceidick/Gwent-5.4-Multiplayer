@@ -1163,16 +1163,24 @@ border-radius: 0.5vw;
 
 .aamad-bonus {
 	left: 74.3%;
-	top: 32.3%;
 	width: 14%;
-	margin-bottom: -17%;
-	font-size: 1vw;
+	height: 20%;
+	margin-bottom: -6%;
+	font-size: 1.1vw;
 	font-weight: 700;
-	color: #7ee787;
-	text-shadow: 0 0 .3vw #000, 0 0 .3vw #000;
+	color: #daa520;
 	text-align: center;
+	text-shadow: none;
 	z-index: 5;
 	pointer-events: none;
+}
+
+#aamad-bonus-me {
+	top: 36%;
+}
+
+#aamad-bonus-op {
+	top: -4%;
 }
 
 .aamad-bonus-pulse {
