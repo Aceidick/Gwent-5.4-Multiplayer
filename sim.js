@@ -689,6 +689,24 @@ class ControllerAI {
         });
     }
 
+    // Return the card among the provided list having the highest weight
+    getHighestWeightCard(cards) {
+        let data_max = this.getMaximums();
+        let data_board = this.getBoardData();
+        let w = cards.map(c => ({ weight: this.weightCard(c, data_max, data_board), card: c }))
+            .sort((a, b) => b.weight - a.weight);
+        return w.length > 0 ? w[0].card : null;
+    }
+
+    // Return the card among the provided list having the lowest weight
+    getLowestWeightCard(cards) {
+        let data_max = this.getMaximums();
+        let data_board = this.getBoardData();
+        let w = cards.map(c => ({ weight: this.weightCard(c, data_max, data_board), card: c }))
+            .sort((a, b) => a.weight - b.weight);
+        return w.length > 0 ? w[0].card : null;
+    }
+
     // Assigns a weights for how likely the controller with play a card from its hand
     weightCard(card, max, data) {
         let abi
@@ -1849,8 +1867,13 @@ class Board {
                 return weather;
                 break;
             case "close":
+            case "agile":
+            case "agile_cr":
+            case "agile_cs":
+            case "agile_crs":
                 return this.row[isMe ^ isSpy ? 3 : 2];
             case "ranged":
+            case "agile_rs":
                 return this.row[isMe ^ isSpy ? 4 : 1];
             case "siege":
                 return this.row[isMe ^ isSpy ? 5 : 0];
