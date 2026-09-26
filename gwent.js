@@ -1210,6 +1210,9 @@ class Player {
 
         this.health = 2;
         this.total = 0;
+        this.aamadBonus = 0;
+        if (typeof updateAamadCounterUI === "function")
+            updateAamadCounterUI(this, false);
         this.passed = false;
         this.handsize = 10;
         this.mulliganCount = 2;
@@ -3929,12 +3932,18 @@ if (giveupBtn) {
         }
 
         if (typeof player_me !== "undefined" && player_me.aamadBonus && player_me.aamadBonus > 0) {
-            player_me.total -= player_me.aamadBonus;
+            if (typeof player_me.updateTotal === "function") player_me.updateTotal(-player_me.aamadBonus);
+            else player_me.total -= player_me.aamadBonus;
             player_me.aamadBonus = 0;
         }
         if (typeof player_op !== "undefined" && player_op.aamadBonus && player_op.aamadBonus > 0) {
-            player_op.total -= player_op.aamadBonus;
+            if (typeof player_op.updateTotal === "function") player_op.updateTotal(-player_op.aamadBonus);
+            else player_op.total -= player_op.aamadBonus;
             player_op.aamadBonus = 0;
+        }
+        if (typeof updateAamadCounterUI === "function") {
+            updateAamadCounterUI(typeof player_me !== "undefined" ? player_me : null, false);
+            updateAamadCounterUI(typeof player_op !== "undefined" ? player_op : null, false);
         }
         if (typeof board !== "undefined" && board.updateLeader) {
             board.updateLeader();
@@ -4035,12 +4044,18 @@ if (giveupBtnMobile) {
         }
 
         if (typeof player_me !== "undefined" && player_me.aamadBonus && player_me.aamadBonus > 0) {
-            player_me.total -= player_me.aamadBonus;
+            if (typeof player_me.updateTotal === "function") player_me.updateTotal(-player_me.aamadBonus);
+            else player_me.total -= player_me.aamadBonus;
             player_me.aamadBonus = 0;
         }
         if (typeof player_op !== "undefined" && player_op.aamadBonus && player_op.aamadBonus > 0) {
-            player_op.total -= player_op.aamadBonus;
+            if (typeof player_op.updateTotal === "function") player_op.updateTotal(-player_op.aamadBonus);
+            else player_op.total -= player_op.aamadBonus;
             player_op.aamadBonus = 0;
+        }
+        if (typeof updateAamadCounterUI === "function") {
+            updateAamadCounterUI(typeof player_me !== "undefined" ? player_me : null, false);
+            updateAamadCounterUI(typeof player_op !== "undefined" ? player_op : null, false);
         }
         if (typeof board !== "undefined" && board.updateLeader) {
             board.updateLeader();

@@ -1161,6 +1161,36 @@ border-radius: 0.5vw;
 	background-image: url(img/icons/score_total_op.png);
 }
 
+.aamad-bonus {
+	left: 78.5%;
+	top: -6%;
+	width: 14%;
+	height: 33%;
+	margin-bottom: -12%;
+	font-size: 1vw;
+	font-weight: 700;
+	color: #7ee787;
+	text-shadow: 0 0 .3vw #000, 0 0 .3vw #000;
+	background-color: rgba(20, 20, 20, .9);
+	border: .12vw solid goldenrod;
+	border-radius: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 5;
+	pointer-events: none;
+}
+
+.aamad-bonus-pulse {
+	animation: aamad-bonus-pulse .45s ease-out;
+}
+
+@keyframes aamad-bonus-pulse {
+	0% { transform: scale(1); }
+	50% { transform: scale(1.35); }
+	100% { transform: scale(1); }
+}
+
 .score-leader>div {
 	background-image: url(img/icons/icon_high_score.png);
 	background-repeat: no-repeat;
