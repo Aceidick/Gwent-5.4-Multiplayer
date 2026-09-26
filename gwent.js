@@ -6312,14 +6312,10 @@ makePreview(index, num, container_elem, cards) {
                 index: c[0],
                 count: c[1]
             }));
-
-            let leaders = Object.keys(card_dict).map(cid => {
-                return {
-                    index: cid,
-                    card: card_dict[cid]
-                };
-            }).filter(c => c.card.row === "leader" && c.card.deck === this.start_op_deck.faction);
-            this.start_op_deck.leader = leaders[randomInt(leaders.length)];
+            this.start_op_deck.leader = {
+                index: this.start_op_deck.leader,
+                card: card_dict[this.start_op_deck.leader]
+            };
         }
 
         if (game.mode === 1) {
