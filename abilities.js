@@ -4569,7 +4569,7 @@ doppler: {
 
 novigrad_sigismund: {
 		name: "Sigismund Dijkstra",
-		description: "Once per game, prevent the first death of a friendly unit.",
+		description: "Once per game, you may prevent the death of a friendly unit (not Heroes).",
 		        gameStart: (card, player) => {
             let actualPlayer = player || (card ? card.holder : null);
             if (!actualPlayer) return;

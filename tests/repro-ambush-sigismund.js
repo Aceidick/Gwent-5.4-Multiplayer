@@ -8,6 +8,9 @@
 // ambush stays on the row and the once-per-game prevention is burned.
 // Intended behavior: the ambush card goes to the grave and the leader
 // prevention stays available.
+// Additionally: the leader prevention is now a choice - the human player is
+// asked (Save it / Let it die) and only consumes the once-per-game use when
+// the save is accepted; declining lets the unit die and keeps the use.
 const { chromium } = require('playwright-core');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -44,6 +47,13 @@ const fs = require('fs');
     player_op.controller.startTurn = async () => {};
     ui.notification = async () => {};
     game.currPlayer = player_me;
+    window.__popupAnswers = [];
+    window.__popupCalls = [];
+    ui.popup = async (yesName, yes, noName, no, title, description) => {
+      window.__popupCalls.push(title);
+      const answer = window.__popupAnswers.length > 0 ? window.__popupAnswers.shift() : true;
+      return answer ? yes({}) : no({});
+    };
   });
   // Case 1: my ambush card on the opponent's side triggers -> goes to my grave,
   // Sigismund prevention is NOT consumed.
@@ -70,10 +80,31 @@ const fs = require('fs');
   assert(ambushCase.ambushInGrave, 'triggered ambush card goes to the grave');
   assert(!ambushCase.preventionUsed, 'Sigismund death prevention is NOT consumed by an ambush resolving');
   assert(ambushCase.triggerStillOnRow, 'the triggering unit stays on the row');
-  // Case 2: a real destruction still consumes the prevention.
+  // Case 2: a real destruction with the save accepted consumes the prevention.
   const deathCase = await page.evaluate(async ()=>{
     const wait = ms => new Promise(r=>setTimeout(r,ms));
     player_me.sigismundDeathPreventionUsed = false;
+    window.__popupAnswers = [true];
+    const unit = new Card('nr_villen', card_dict['nr_villen'], player_me);
+    const myRow = board.getRow(unit, 'close', player_me);
+    await board.moveTo(unit, myRow, null);
+    await board.toGrave(unit, myRow);
+    await wait(300);
+    return {
+      popupShown: window.__popupCalls.includes('Do you want to save this unit?'),
+      preventionUsed: !!player_me.sigismundDeathPreventionUsed,
+      unitSaved: myRow.cards.includes(unit)
+    };
+  });
+  console.log(JSON.stringify(deathCase, null, 2));
+  assert(deathCase.popupShown, 'a real unit destruction asks the Sigismund save question');
+  assert(deathCase.preventionUsed, 'accepting the save consumes the Sigismund prevention');
+  assert(deathCase.unitSaved, 'the destroyed unit is saved on the row');
+  // Case 3: declining the save lets the unit die and keeps the prevention.
+  const declineCase = await page.evaluate(async ()=>{
+    const wait = ms => new Promise(r=>setTimeout(r,ms));
+    player_me.sigismundDeathPreventionUsed = false;
+    window.__popupAnswers = [false];
     const unit = new Card('nr_villen', card_dict['nr_villen'], player_me);
     const myRow = board.getRow(unit, 'close', player_me);
     await board.moveTo(unit, myRow, null);
@@ -81,12 +112,14 @@ const fs = require('fs');
     await wait(300);
     return {
       preventionUsed: !!player_me.sigismundDeathPreventionUsed,
-      unitSaved: myRow.cards.includes(unit)
+      unitInGrave: player_me.grave.cards.includes(unit),
+      unitStillOnRow: myRow.cards.includes(unit)
     };
   });
-  console.log(JSON.stringify(deathCase, null, 2));
-  assert(deathCase.preventionUsed, 'a real unit destruction consumes the Sigismund prevention');
-  assert(deathCase.unitSaved, 'the destroyed unit is saved on the row');
+  console.log(JSON.stringify(declineCase, null, 2));
+  assert(!declineCase.preventionUsed, 'declining the save keeps the Sigismund prevention available');
+  assert(declineCase.unitInGrave, 'declining the save lets the unit die');
+  assert(!declineCase.unitStillOnRow, 'declining the save removes the unit from the row');
   console.log(failed ? 'DONE (failures)' : 'DONE (all passed)');
   await browser.close();
   server.kill();

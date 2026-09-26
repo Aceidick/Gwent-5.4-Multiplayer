@@ -2751,11 +2751,18 @@ class Board {
                 card.holder.leader.abilities.includes("novigrad_sigismund") &&
                 !card.holder.sigismundDeathPreventionUsed &&
                 !card.hero) {
-                
-                card.holder.sigismundDeathPreventionUsed = true;
-                await ui.notification("novigrad-sigismund", 1200);
-                await card.animate("shield");
-                destroy = false;
+                let save = true;
+                if (!(card.holder.controller instanceof ControllerAI)) {
+                    save = await ui.popup("Save it [E]", () => true, "Let it die [Q]", () => false, "Do you want to save this unit?", "Sigismund Dijkstra can prevent the death of the following card: " + card.name + " (strength: " + card.power + "). This can be done only once per game. Do you want to save it?");
+                } else {
+                    save = card.power > 5;
+                }
+                if (save) {
+                    card.holder.sigismundDeathPreventionUsed = true;
+                    await ui.notification("novigrad-sigismund", 1200);
+                    await card.animate("shield");
+                    destroy = false;
+                }
             }
 
             // Checking Protection abilities such as Comrade
