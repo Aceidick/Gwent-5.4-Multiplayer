@@ -2766,7 +2766,9 @@ class Board {
             }
 
             // Checking Protection abilities such as Comrade
-            if (destroy) {
+            // (round-end cleanup is not a destruction: protections must not
+            // fire there, or saved units would stay on the board next round)
+            if (destroy && !turnEnd) {
                 protectors = card.holder.getAllRowCards().filter(c => c.abilities.includes("comrade") && c.protects);
                 if (protectors.length > 0) {
                     let choice = false;
@@ -2786,7 +2788,7 @@ class Board {
             }
             
             // For Wild Hunt faction: Imlerith protects navigators
-            if (destroy && card.abilities.includes("door_o") && card.holder.leader.key === "wh_imlerith_general") {
+            if (destroy && !turnEnd && card.abilities.includes("door_o") && card.holder.leader.key === "wh_imlerith_general") {
                 destroy = false;
             }
         }

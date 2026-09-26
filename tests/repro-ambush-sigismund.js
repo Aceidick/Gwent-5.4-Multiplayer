@@ -11,6 +11,10 @@
 // Additionally: the leader prevention is now a choice - the human player is
 // asked (Save it / Let it die) and only consumes the once-per-game use when
 // the save is accepted; declining lets the unit die and keeps the use.
+// Round-end regression: the board cleanup at the end of a round is not a
+// destruction. Neither Sigismund nor Comrade may fire there - otherwise a
+// saved unit would stay on the board into the next round and every unit
+// would prompt a popup during cleanup.
 const { chromium } = require('playwright-core');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -120,6 +124,57 @@ const fs = require('fs');
   assert(!declineCase.preventionUsed, 'declining the save keeps the Sigismund prevention available');
   assert(declineCase.unitInGrave, 'declining the save lets the unit die');
   assert(!declineCase.unitStillOnRow, 'declining the save removes the unit from the row');
+  // Case 4: round-end cleanup must not trigger the Sigismund popup.
+  const roundEndSigismund = await page.evaluate(async ()=>{
+    const wait = ms => new Promise(r=>setTimeout(r,ms));
+    window.__popupCalls.length = 0;
+    window.__popupAnswers = [];
+    player_me.sigismundDeathPreventionUsed = false;
+    const unit = new Card('nr_villen', card_dict['nr_villen'], player_me);
+    const myRow = board.getRow(unit, 'close', player_me);
+    await board.moveTo(unit, myRow, null);
+    player_me.passed = true; player_op.passed = true;
+    await game.endRound();
+    await wait(2500);
+    return {
+      popupShown: window.__popupCalls.includes('Do you want to save this unit?'),
+      preventionUsed: !!player_me.sigismundDeathPreventionUsed,
+      unitInGrave: player_me.grave.cards.includes(unit),
+      unitStillOnBoard: board.row.some(r=>r.cards.includes(unit))
+    };
+  });
+  console.log(JSON.stringify(roundEndSigismund, null, 2));
+  assert(!roundEndSigismund.popupShown, 'round-end cleanup does not prompt the Sigismund popup');
+  assert(!roundEndSigismund.preventionUsed, 'round-end cleanup does not consume the Sigismund prevention');
+  assert(roundEndSigismund.unitInGrave, 'round-end cleanup sends the unit to the grave');
+  assert(!roundEndSigismund.unitStillOnBoard, 'no unit lingers on the board into the next round (Sigismund)');
+  // Case 5: round-end cleanup must not trigger the Comrade popup either.
+  const roundEndComrade = await page.evaluate(async ()=>{
+    const wait = ms => new Promise(r=>setTimeout(r,ms));
+    window.__popupCalls.length = 0;
+    window.__popupAnswers = [];
+    const zoltan = new Card('nv_zoltan', card_dict['nv_zoltan'], player_me);
+    const unit = new Card('nr_villen', card_dict['nr_villen'], player_me);
+    const myRow = board.getRow(zoltan, 'close', player_me);
+    await board.moveTo(zoltan, myRow, null);
+    await board.moveTo(unit, myRow, null);
+    zoltan.protects = true;
+    player_me.passed = true; player_op.passed = true;
+    await game.endRound();
+    await wait(2500);
+    return {
+      popupShown: window.__popupCalls.includes('Do you want to save this unit?'),
+      unitInGrave: player_me.grave.cards.includes(unit),
+      zoltanInGrave: player_me.grave.cards.includes(zoltan),
+      unitStillOnBoard: board.row.some(r=>r.cards.includes(unit)),
+      zoltanStillOnBoard: board.row.some(r=>r.cards.includes(zoltan))
+    };
+  });
+  console.log(JSON.stringify(roundEndComrade, null, 2));
+  assert(!roundEndComrade.popupShown, 'round-end cleanup does not prompt the Comrade popup');
+  assert(roundEndComrade.unitInGrave, 'round-end cleanup sends the protected unit to the grave');
+  assert(roundEndComrade.zoltanInGrave, 'round-end cleanup sends Zoltan himself to the grave');
+  assert(!roundEndComrade.unitStillOnBoard && !roundEndComrade.zoltanStillOnBoard, 'no unit lingers on the board into the next round (Comrade)');
   console.log(failed ? 'DONE (failures)' : 'DONE (all passed)');
   await browser.close();
   server.kill();
