@@ -1275,11 +1275,17 @@ class Player {
             }
 
 
-    // Puts the player in the winning state
+    // Puts the player in the winning state.
+    // IMPORTANT: this must be idempotent. Toggling the DOM class only when
+    // the model boolean changed lets a desynced class (rematch/reset/give-up
+    // flows also manipulate the model and the class directly) flip the wreath
+    // to the wrong player or drop it entirely. Force the DOM to the requested
+    // state every time instead of relying on previous UI state.
     setWinning(isWinning) {
-        if (this.winning ^ isWinning)
-            document.getElementById("score-total-" + this.tag).classList.toggle("score-leader");
+        isWinning = !!isWinning;
         this.winning = isWinning;
+        const elem = document.getElementById("score-total-" + this.tag);
+        if (elem) elem.classList.toggle("score-leader", isWinning);
     }
 
     // Puts the player in the passed state.
