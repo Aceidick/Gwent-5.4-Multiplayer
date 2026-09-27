@@ -442,6 +442,7 @@ dragon_wrath: {
                 for (const c of cards.cards) {
                     if (c === targetCard) {
                         await board.toHand(c, card.holder.deck);
+                        if (typeof creditAamadDraw === "function") creditAamadDraw(card.holder, 1);
                     } else {
                         card.holder.deck.removeCard(c);
                         card.holder.deck.addCard(c);
@@ -4574,6 +4575,20 @@ novigrad_sigismund: {
 		}
 	},
 };
+
+// Credits an ad-hoc card acquisition as a draw for "Aamad, the Wise" (ofir_aamad):
+// abilities that move a card into a player's hand without going through
+// Deck.draw() (e.g. the Toussaint spy "keep one of three" pick) must still
+// count as the player drawing a card.
+function creditAamadDraw(player, count = 1) {
+    if (!player || !player.leader || !player.leader.abilities || !player.leader.abilities.includes("ofir_aamad")) return;
+    for (let i = 0; i < count; i++) {
+        player.aamadBonus = (player.aamadBonus || 0) + 1;
+        if (typeof player.updateTotal === "function") player.updateTotal(1);
+        else player.total += 1;
+    }
+    if (typeof updateAamadCounterUI === "function") updateAamadCounterUI(player, true);
+}
 
 // Updates the "Aamad, the Wise" bonus counter badge next to the player's total
 // score. The badge is only visible while the leader ability has accumulated a
