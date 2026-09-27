@@ -3249,41 +3249,28 @@ ofiri_envoy: {
         name: "Aamad, the Wise",
         description: "Whenever you draw a card, you gain +1 total power for this round permanently (resets upon round completion back to 0).",
         gameStart: (card, player) => {
-            if (player_me && player_me.leader && player_me.leader.abilities && player_me.leader.abilities.includes("ofir_aamad")) {
-                if (!player_me.aamadBonus) player_me.aamadBonus = 0;
-                
-                if (player_me.deck && typeof player_me.deck.draw === "function" && !player_me.deck.draw._isPatched) {
-                    const originalDrawMe = player_me.deck.draw.bind(player_me.deck);
-                    player_me.deck.draw = async function(hand) {
-                        const result = await originalDrawMe(hand);
-                        player_me.aamadBonus = (player_me.aamadBonus || 0) + 1;
-                        if (typeof player_me.updateTotal === "function") player_me.updateTotal(1);
-                        else player_me.total += 1;
-                        updateAamadCounterUI(player_me, true);
-                        return result;
-                    };
-                    player_me.deck.draw._isPatched = true; // Candado anti-duplicación
-                }
-                updateAamadCounterUI(player_me, false);
+            const aamadPlayers = [player_me, player_op].filter(p => p && p.leader && p.leader.abilities && p.leader.abilities.includes("ofir_aamad"));
+            for (const p of aamadPlayers) {
+                if (!p.aamadBonus) p.aamadBonus = 0;
             }
+            for (const owner of [player_me, player_op]) {
+                if (!owner || !owner.deck || typeof owner.deck.draw !== "function" || owner.deck.draw._isPatched) continue;
+                const originalDraw = owner.deck.draw.bind(owner.deck);
+                owner.deck.draw = async function(hand) {
+                    const result = await originalDraw(hand);
+                    const recipient = (hand && hand.player) ? hand.player : owner;
+                    if (recipient && recipient.leader && recipient.leader.abilities && recipient.leader.abilities.includes("ofir_aamad")) {
+                        recipient.aamadBonus = (recipient.aamadBonus || 0) + 1;
+                        if (typeof recipient.updateTotal === "function") recipient.updateTotal(1);
+                        else recipient.total += 1;
+                        updateAamadCounterUI(recipient, true);
+                    }
+                    return result;
+                };
+                owner.deck.draw._isPatched = true; // Candado anti-duplicación
+            }
+            for (const p of aamadPlayers) updateAamadCounterUI(p, false);
 
-            if (player_op && player_op.leader && player_op.leader.abilities && player_op.leader.abilities.includes("ofir_aamad")) {
-                if (!player_op.aamadBonus) player_op.aamadBonus = 0;
-                
-                if (player_op.deck && typeof player_op.deck.draw === "function" && !player_op.deck.draw._isPatched) {
-                    const originalDrawOp = player_op.deck.draw.bind(player_op.deck);
-                    player_op.deck.draw = async function(hand) {
-                        const result = await originalDrawOp(hand);
-                        player_op.aamadBonus = (player_op.aamadBonus || 0) + 1;
-                        if (typeof player_op.updateTotal === "function") player_op.updateTotal(1);
-                        else player_op.total += 1;
-                        updateAamadCounterUI(player_op, true);
-                        return result;
-                    };
-                    player_op.deck.draw._isPatched = true; // Candado anti-duplicación
-                }
-                updateAamadCounterUI(player_op, false);
-            }
             
             game.roundStart.push(async () => {
                 if (player_me && player_me.aamadBonus && player_me.aamadBonus > 0) {

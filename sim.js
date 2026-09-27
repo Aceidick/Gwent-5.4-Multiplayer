@@ -875,6 +875,7 @@ class Player {
         } else {
             this.hand = (id === 0) ? new Hand(null, this.tag) : new HandAI(this.tag);
         }
+        this.hand.player = this;
         this.grave = new Grave(document.getElementById("grave-" + this.tag));
         this.deck = new Deck(deck.faction, document.getElementById("deck-" + this.tag));
         this.deck_data = deck;
