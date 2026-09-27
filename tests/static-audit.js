@@ -255,6 +255,27 @@ ok(!/(^|\n)\s*(?!await\s+new Promise)(?:card\.holder|player)\.selectCardDestinat
 ok(abilities.includes('await resolveInOrder(op_spies,') && abilities.includes('await resolveInOrder(targetCards,'), 'audit removes detached async collection moves in affected abilities');
 const contAuditDoc = fs.readFileSync(path.join(root, 'docs', 'CONTINUATION_AUDIT_V1.3.9.md'), 'utf8');
 ok(contAuditDoc.includes('Emhyr') && contAuditDoc.includes('decision owner') && contAuditDoc.includes('leader preview'), 'v1.3.9 audit documents the full continuation failure class');
+// Deck pile card backs must match the 2:3 aspect of the .deck-card box,
+// otherwise background-size:contain renders them narrower than every other
+// faction's pile (reported as a randomly "squashed" deck stack).
+function imageSize(file) {
+  const buf = fs.readFileSync(file);
+  if (buf.length > 24 && buf[0] === 0x89 && buf[1] === 0x50)
+    return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+  let i = 2;
+  while (i + 9 < buf.length) {
+    if (buf[i] !== 0xff) break;
+    const marker = buf[i + 1];
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc)
+      return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+    i += 2 + buf.readUInt16BE(i + 2);
+  }
+  return null;
+}
+for (const name of fs.readdirSync(path.join(root, 'img', 'icons')).filter(x => x.startsWith('deck_back_'))) {
+  const size = imageSize(path.join(root, 'img', 'icons', name));
+  ok(!!size && Math.abs(size.w / size.h - 2 / 3) < 0.01, `deck back ${name} keeps the 2:3 card aspect`);
+}
 
 console.log(failed ? 'RESULT: FAILED' : 'RESULT: ALL STATIC CHECKS PASS');
 process.exit(failed ? 1 : 0);
