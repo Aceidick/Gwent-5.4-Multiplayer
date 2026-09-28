@@ -217,7 +217,7 @@ ok(gwent.includes('addEventListener("wheel"') && gwent.includes('curr.shift(e, d
 
 // v1.3.5 round-transition audit regressions.
 ok(gwent.includes('await weather.clearWeather()') && gwent.includes('for (const row of board.row) {') && gwent.includes('await row.clear();'), 'round cleanup awaits weather and serialized row cleanup');
-ok(gwent.includes('async clear()') && gwent.includes('for (const c of units) await board.toGrave(c, this, true)'), 'Row.clear is async and awaits grave moves');
+ok(gwent.includes('async clear()') && gwent.includes('board.moveTo(c, "grave", this).then(resolve, resolve)') && gwent.includes('await Promise.all(moves)'), 'Row.clear is async and awaits all grave moves in parallel');
 ok(gwent.includes('await this.startRound(verdict)') && gwent.includes('await this.startTurn()'), 'round lifecycle chaining is awaited');
 ok(online.includes('roundPhaseBarrier(phase)') && online.includes("t:'round-phase'"), 'online round phase barrier exists');
 ok(online.includes('effect-enter') && online.includes('effect-done'), 'online round effects are traced per effect');

@@ -2505,8 +2505,21 @@ class Row extends CardContainer {
         // Copy the arrays first because board.toGrave() mutates the containers.
         const specials = this.special.cards.filter(c => !c.noRemove).slice();
         const units = this.cards.filter(c => !c.noRemove).slice();
-        for (const c of specials) await board.toGrave(c, this, true);
-        for (const c of units) await board.toGrave(c, this, true);
+        if (specials.length === 0 && units.length === 0)
+            return;
+        tocar("discard", false);
+        // Round-end cleanup moves every card to the grave with no protection
+        // checks or destroyed-hooks (turnEnd=true), so the per-card toGrave()
+        // logic is bypassed: reset power and translate all cards in parallel
+        // instead of one 500ms animation per card.
+        const moves = specials.concat(units).map(c => new Promise(resolve => {
+            if (c && typeof c.resetPower === "function")
+                c.resetPower();
+            else if (c && c.basePower !== undefined)
+                c.power = c.basePower;
+            board.moveTo(c, "grave", this).then(resolve, resolve);
+        }));
+        await Promise.all(moves);
     }
 
     // Returns all regular unit cards with the heighest power
