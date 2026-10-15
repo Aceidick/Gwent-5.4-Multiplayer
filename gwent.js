@@ -4695,13 +4695,24 @@ navigator.vibrate(50);
     // Displays a Carousel menu of filtered container items that match the predicate.
     // Suspends gameplay until the Carousel is closed. Automatically picks random card if activated for AI player
     async queueCarousel(container, count, action, predicate, bSort, bQuit, title, bRedraw = false) {
-        /*if (game.currPlayer && game.currPlayer.controller instanceof ControllerAI) {
-            for (let i = 0; i < count; ++i) {
-                let cards = container.cards.reduce((a, c, i) => !predicate || predicate(c) ? a.concat([i]) : a, []);
-                await action(container, cards[randomInt(cards.length)]);
+        // Offline AI decisions: when the chooser is a ControllerAI (player vs
+        // computer / AI vs AI), the carousel has no human to drive it. Left to
+        // its own devices Carousel.completion never resolves and the game
+        // freezes. Auto-pick weighted candidates instead. Online mode wraps
+        // queueCarousel separately, so this branch only fires offline.
+        const chooser = game.currPlayer;
+        if (chooser && chooser.controller instanceof ControllerAI &&
+            !(window.GwentOnline && GwentOnline.active)) {
+            let indices = container.cards.reduce((a, c, i) => (!predicate || predicate(c)) ? a.concat([i]) : a, []);
+            let picks = Math.min(count, indices.length);
+            for (let i = 0; i < picks; ++i) {
+                if (indices.length === 0) break;
+                let pick = indices[randomInt(indices.length)];
+                indices = indices.filter(idx => idx !== pick);
+                await action(container, pick);
             }
             return;
-        }*/
+        }
         let carousel = new Carousel(container, count, action, predicate, bSort, bQuit, title, bRedraw);
         if (Carousel.curr === undefined || Carousel.curr === null) {
             carousel.start();
