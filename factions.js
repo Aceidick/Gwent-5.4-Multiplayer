@@ -438,26 +438,25 @@ tocar("game_buy", false);
                         ui.previewCard = null;
                         
                         if (play) {
-                            if (!(player.controller instanceof ControllerAI)) {
+                            let filaDestino = player.getAllRows().find(r => r.special.cards.includes(door));
+                            if (card.name === "Decoy" || !filaDestino) {
+                                player.deck.addCard(card);
+                            } else if (!(player.controller instanceof ControllerAI)) {
                                 let choiceDone = false;
                                 await player.selectCardDestination(card, player.deck, async () => {
                                     choiceDone = true;
                                     if (typeof ui.enablePlayer === "function") ui.enablePlayer(true);
                                 });
                                 await sleepUntil(() => choiceDone, 100);
+                            } else if (card.key === "spe_scorch" || card.name === "Scorch") {
+                                if (typeof player.getAIController === "function" && player.getAIController().playCardDefault) {
+                                    await player.getAIController().playCardDefault(card, player.deck);
+                                } else if (player.controller.playCardDefault) {
+                                    await player.controller.playCardDefault(card, player.deck);
+                                }
+                                await sleep(600);
+                                if (typeof board !== "undefined" && board.updateScores) board.updateScores();
                             } else {
-                                let filaDestino = player.getAllRows().find(r => r.special.cards.includes(door));
-                                if (card.name === "Decoy" || !filaDestino) {
-                                    player.deck.addCard(card);
-                                } else if (card.key === "spe_scorch" || card.name === "Scorch") {
-                                    if (typeof player.getAIController === "function" && player.getAIController().playCardDefault) {
-                                        await player.getAIController().playCardDefault(card, player.deck);
-                                    } else if (player.controller.playCardDefault) {
-                                        await player.controller.playCardDefault(card, player.deck);
-                                    }
-                                    await sleep(600);
-                                    if (typeof board !== "undefined" && board.updateScores) board.updateScores();
-                                } else {
                                     if (card.row === "weather") {
                                         let contenedorClima = (typeof weather !== "undefined") ? weather : filaDestino.special;
                                         contenedorClima.addCard(card);
@@ -493,8 +492,7 @@ tocar("game_buy", false);
                                     await sleep(400);
                                     if (typeof board !== "undefined" && board.updateScores) board.updateScores();
                                     if (typeof game.resize === "function") game.resize();
-                                }              
-                            }
+                                }
                         } else {
                             player.deck.addCard(card);
                         } 
