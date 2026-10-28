@@ -373,8 +373,18 @@ class ControllerAI {
         } else if (usable_data.scorch.length) {
             targ = usable_data.scorch[randomInt(usable_data.scorch.length)];
         } else {
+            // Units with the Decoy ability only work on their own combat rows;
+            // resolve the actual Row objects instead of array indexes so the
+            // check is correct for both players.
+            let validRows = [];
+            if (["close", "agile"].includes(card.row))
+                validRows.push(board.getRow(card, "close", this.player));
+            if (["ranged", "agile"].includes(card.row))
+                validRows.push(board.getRow(card, "ranged", this.player));
+            if (card.row === "siege")
+                validRows.push(board.getRow(card, "siege", this.player));
             let pairs = max.rmax.filter((r, i) => this.isSelfRowIndex(i) && r.cards.length)
-                .filter((r, i) => card.row.length === 0 || (["close", "agile"].includes(card.row) && (i === 2 || i === 3)) || (["ranged", "agile"].includes(card.row) && (i === 1 || i === 4)) || (card.row === "siege" && (i === 0 || i === 5)))
+                .filter(r => card.row.length === 0 || validRows.includes(r.row))
                 .reduce((a, r) =>
                     r.cards.map(c => ({
                         r: r.row,
@@ -389,17 +399,24 @@ class ControllerAI {
         }
 
         if (targ) {
-            for (let i = 0; !row; ++i) {
-                if (board.row[i].cards.indexOf(targ) !== -1) {
+            // A Decoy may only take a unit from the acting player's own half.
+            // The scan is bounded so a target that is not on an own row falls
+            // through to the default placement instead of reading past the end
+            // of board.row.
+            for (let i = 0; i < board.row.length && !row; ++i) {
+                if (this.isSelfRowIndex(i) && board.row[i].cards.indexOf(targ) !== -1) {
                     row = board.row[i];
                     break;
                 }
             }
-            targ.decoyTarget = true;
-            board.toHand(targ, row);
-        } else {
-            row = ["close", "agile"].includes(card.row) ? board.getRow(card, "close", this.player) : card.row === "ranged" ? board.getRow(card, "ranged", this.player) : board.getRow(card, "siege", this.player);
+            if (row) {
+                targ.decoyTarget = true;
+                targ.holder = this.player;
+                board.toHand(targ, row);
+            }
         }
+        if (!row)
+            row = ["close", "agile"].includes(card.row) ? board.getRow(card, "close", this.player) : card.row === "ranged" ? board.getRow(card, "ranged", this.player) : board.getRow(card, "siege", this.player);
         await this.player.playCardToRow(card, row);
     }
 
@@ -672,6 +689,24 @@ class ControllerAI {
         });
     }
 
+    // Return the card among the provided list having the highest weight
+    getHighestWeightCard(cards) {
+        let data_max = this.getMaximums();
+        let data_board = this.getBoardData();
+        let w = cards.map(c => ({ weight: this.weightCard(c, data_max, data_board), card: c }))
+            .sort((a, b) => b.weight - a.weight);
+        return w.length > 0 ? w[0].card : null;
+    }
+
+    // Return the card among the provided list having the lowest weight
+    getLowestWeightCard(cards) {
+        let data_max = this.getMaximums();
+        let data_board = this.getBoardData();
+        let w = cards.map(c => ({ weight: this.weightCard(c, data_max, data_board), card: c }))
+            .sort((a, b) => a.weight - b.weight);
+        return w.length > 0 ? w[0].card : null;
+    }
+
     // Assigns a weights for how likely the controller with play a card from its hand
     weightCard(card, max, data) {
         let abi
@@ -840,6 +875,7 @@ class Player {
         } else {
             this.hand = (id === 0) ? new Hand(null, this.tag) : new HandAI(this.tag);
         }
+        this.hand.player = this;
         this.grave = new Grave(document.getElementById("grave-" + this.tag));
         this.deck = new Deck(deck.faction, document.getElementById("deck-" + this.tag));
         this.deck_data = deck;
@@ -1832,8 +1868,13 @@ class Board {
                 return weather;
                 break;
             case "close":
+            case "agile":
+            case "agile_cr":
+            case "agile_cs":
+            case "agile_crs":
                 return this.row[isMe ^ isSpy ? 3 : 2];
             case "ranged":
+            case "agile_rs":
                 return this.row[isMe ^ isSpy ? 4 : 1];
             case "siege":
                 return this.row[isMe ^ isSpy ? 5 : 0];
@@ -2255,6 +2296,7 @@ class UI {
         } else if (pCard.abilities.includes("decoy")) {
             this.hidePreview(card);
             card.decoyTarget = true;
+            card.holder = pCard.holder;
             board.toHand(card, row);
             await board.moveTo(pCard, row, pCard.holder.hand);
             await pCard.holder.endTurn();

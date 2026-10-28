@@ -919,6 +919,44 @@ let default_decks = [{
             ["sk_kambi", 1]
         ]
     },
+    {
+        "title": "Skellige",
+        "description": "Deck relying mostly on berserker units",
+        "leader": "sk_crach_an_craite",
+        "faction": "skellige",
+        "cards": [
+            ["spe_mardroeme", 2],
+            ["spe_skellige_fleet", 2],
+            ["spe_horn", 1],
+            ["spe_decoy", 1],
+            ["spe_scorch", 1],
+            ["spe_clear", 1],
+            ["spe_frost", 1],
+            ["spe_rain", 1],
+            ["sk_hjalmar", 1],
+            ["sk_brokva_archer", 1],
+            ["sk_cerys", 1],
+            ["sk_ermion", 1],
+            ["ntr_yennefer", 1],
+            ["sk_longship_1", 1],
+            ["sk_longship_3", 1],
+            ["sk_longship_2", 1],
+            ["sk_berserker", 1],
+            ["sk_shield_maiden_1", 1],
+            ["sk_shield_maiden_2", 1],
+            ["sk_shield_maiden_3", 1],
+            ["sk_light_longship_1", 1],
+            ["sk_light_longship_2", 1],
+            ["sk_light_longship_3", 1],
+            ["sk_vildkaarl", 1],
+            ["sk_gremist", 1],
+            ["sk_young_berserker_1", 1],
+            ["sk_young_berserker_2", 1],
+            ["sk_young_berserker_3", 1],
+            ["sk_arnvald", 1],
+            ["sk_kambi", 1]
+        ]
+    },
    {
         "title": "Witcher Universe",
         "description": "Witcher Universe deck focusing on witcher schools - Playstyle: Witcher Schools, Resilience, Scorch",
@@ -1545,6 +1583,38 @@ let default_decks = [{
             ["sy_inquisitor_helveed", 1]
         ]
     },
+    {
+        "title": "Syndicate",
+        "description": "Syndicate deck focusing on cards of the Eternal Fire - Playstyle: Witch Hunt, Muster, Dimeritium",
+        "leader": "sy_azar_javed",
+        "faction": "syndicate",
+        "cards": [
+            ["spe_horn", 1],
+            ["spe_decoy", 2],
+            ["spe_rain", 1],
+            ["spe_clear", 1],
+            ["ntr_geralt", 1],
+            ["ntr_triss", 1],
+            ["ntr_ciri", 1],
+            ["spe_dimeritium_shackles", 2],
+            ["sy_flaming_rose_footman", 1],
+            ["sy_witch_hunter", 1],
+            ["sy_witch_hunter_executioner", 1],
+            ["sy_eternal_fire_inquisitor", 1],
+            ["sy_caleb_menge", 1],
+            ["sy_moreelse", 1],
+            ["sy_jacques_aldersberg", 1],
+            ["sy_temple_guard", 1],
+            ["sy_roderick_wett", 1],
+            ["sy_ulrich", 1],
+            ["sy_walter_veritas", 1],
+            ["sy_ignatius_hale", 1],
+            ["sy_cleric_flaming_rose", 1],
+            ["sy_eternal_fire_disciple", 2],
+            ["sy_lonely_champion", 1],
+            ["sy_inquisitor_helveed", 1]
+        ]
+    },
   {
         "title": "Zerrikania",
         "description": "Zerrikania deck focusing on dragons and their whorshippers - Playstyle: Worshipper / Whorshipped",
@@ -1914,6 +1984,33 @@ let default_decks = [{
             ["ntr_mysterious_elf", 1]
         ]
     },
+    {
+        "title": "Wild Hunt",
+        "description": "Deck relying mostly on bond door mechanic",
+        "leader": "wh_auberon_king",
+        "faction": "wild_hunt",
+        "cards": [
+            ["ntr_geralt", 1],
+            ["wh_imlerith", 1],
+            ["wh_nithral", 1],
+            ["wh_avallach", 1],
+            ["wh_geels", 1],
+            ["wh_navigator_3", 1],
+            ["wh_wild_hunt_rider_1", 2],
+            ["wh_wild_hunt_hound_1", 1],
+            ["wh_wild_hunt_hound_2", 1],
+            ["wh_wild_hunt_rider_3", 2],
+            ["ntr_yennefer", 1],
+            ["wh_naglfar_cartographer", 1],
+            ["wh_naglfar_taskmaster", 1],
+            ["wh_navigator_2", 1],
+            ["wh_naglfar_crew", 2],
+            ["wh_navigator_1", 1],
+            ["wh_cirilla", 1],
+            ["wh_aen_elle_conqueror_1", 1],
+            ["ntr_mysterious_elf", 1]
+        ]
+    },
 	{
 		"title": "Ofir",
 		"description": "Nibras deck",
@@ -2224,10 +2321,89 @@ let default_decks = [{
 			["nv_kalkstein", 1],
 			["ntr_triss", 1],
 			["nv_aphotecary", 1],
-			["nv_caesar_bilzen", 1],
+			["nv_caesar_bilzen", 1]
+		]
+	},
+
+	{
+		"title": "Old Northern Realms - Slaughter of Cintra",
+		"description": "Old Northern Realms deck focusing on Cintra and neighbour realms - Playstyle: Summon Avenger, Slaughter of Cintra, Muster",
+		"leader": "onr_queen_calanthe",
+		"faction": "old_realms",
+		"cards": [
+			["spe_horn", 1],
+			["spe_decoy", 2],
+			["spe_frost", 1],
+			["spe_clear", 1],
+			["spe_scorch", 1],
+			["spe_onr_slaughter_1", 1],
+			["spe_onr_slaughter_2", 1],
+			["onr_viraxas", 1],
+			["onr_kerack_fleet_marine_2", 1],
+			["onr_kerack_fleet_frigate", 1],
+			["onr_kerack_fleet_marine_1", 1],
+			["onr_vissegerd", 1],
+			["onr_cintrian_royal_guard", 2],
+			["onr_eist_tuirseach", 1],
+			["onr_skellige_fleet_1", 1],
+			["onr_skellige_fleet_2", 1],
+			["onr_skellige_fleet_3", 1],
+			["onr_cintrian_knight", 2],
+			["onr_roegner", 1],
+			["onr_pavetta", 1],
+			["onr_kistrin_verden", 1],
+			["onr_sha", 1],
+			["onr_kraken", 1],
+			["onr_egmund", 1],
+			["onr_eylembert_tigg", 1],
+			["onr_young_ciri", 1],
+			["ntr_ciri", 1],
+			["onr_cintrian_peasants", 2],
+			["onr_windhalm", 1]
+		]
+	},
+	{
+		"title": "Old Northern Realms - False Empress",
+		"description": "Old Northern Realms deck focusing on the mock-empress installed after the fall of Cintra - Playstyle: Spy, Tight Bond, Hero units",
+		"leader": "onr_fake_ciri",
+		"faction": "old_realms",
+		"cards": [
+			["spe_horn", 1],
+			["spe_decoy", 2],
+			["spe_frost", 1],
+			["spe_clear", 1],
+			["spe_scorch", 1],
+			["spe_onr_slaughter_1", 1],
+			["nr_stennis", 1],
+			["nr_dijkstra", 1],
+			["nr_thaler", 1],
+			["onr_cintrian_envoy", 1],
+			["nr_vernon", 1],
+			["nr_natalis", 1],
+			["nr_esterad", 1],
+			["nr_philippa", 1],
+			["nr_ves", 1],
+			["nr_olgierd", 1],
+			["nr_villen", 1],
+			["nr_blue_stripes_1", 1],
+			["nr_blue_stripes_2", 1],
+			["nr_blue_stripes_3", 1],
+			["nr_crinfrid_1", 1],
+			["nr_crinfrid_2", 1],
+			["nr_crinfrid_3", 1],
+			["nr_ballista_1", 1],
+			["nr_ballista_2", 1],
+			["nr_catapult_1", 1],
+			["nr_catapult_2", 1],
+			["nr_banner_nurse", 1],
+			["nr_kaedwen_siege_1", 1],
+			["nr_kaedwen_siege_2", 1],
+			["ntr_ciri", 1],
+			["ntr_mysterious_elf", 1]
 		]
 	}
 ];
+
 
 /*
  * 

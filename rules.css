@@ -375,6 +375,12 @@ Hides the menu at `48em`, but modify this based on your app's needs.
     padding: 5px;
 }
 
+.faction-old_realms {
+    background-color: #2b1a4e;
+    color: #d4af37;
+    padding: 5px;
+}
+
 .card-preview {
     border-radius: 0.5vw;
 }
