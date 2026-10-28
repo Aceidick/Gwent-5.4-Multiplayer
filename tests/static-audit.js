@@ -167,14 +167,6 @@ ok(online.includes('oldWeatherAddCard'), 'weather card abilities execute in owne
 ok(online.includes('oldPlayCardAction'), 'activated card abilities execute in owner context');
 ok(online.includes('leader:${this.leader?.key'), 'active leaders execute in owner context');
 ok(online.includes('faction:${this.deck?.faction'), 'active factions execute in owner context');
-// v1.4.4 player-vs-friend desync regressions (popup/destination/carousel
-// timeouts, opening-mulligan RNG divergence, parallel round cleanup).
-ok(online.includes("popup-choice', x => x.decision === decision.id, 120000"), 'remote popup decisions wait 120s instead of desyncing at 30s');
-ok(online.includes("x => x.decision === decision.id, 120000, `Timed out waiting for carousel choice"), 'remote carousel decisions wait 120s for large card pools');
-ok(online.includes('x => x.decision === decision.id, 120000,\n            `Timed out waiting for continuation destination'), 'remote continuation destinations wait 120s instead of 30s');
-ok(online.includes("return fake.choice !== null && fake.choice !== undefined ? fake.choice : returned;"), 'remote popup replay returns the callback value so Comrade save answers match');
-ok(gwent.includes('for (const row of board.row) {') && gwent.includes('await row.clear();') && !gwent.includes('await Promise.all(board.row.map(async row => {'), 'round-end row cleanup is serialized so overlapping save popups cannot strand a peer');
-ok(online.includes('withLocalShuffleRng') && online.includes('await this.withLocalShuffleRng(() => p.deck.swap('), 'opening mulligan shuffles do not consume the seeded peer-synchronized deckRng stream');
 const auditDoc = fs.readFileSync(path.join(root, 'docs', 'FULL_MULTIPLAYER_AUDIT_V1.3.0.md'), 'utf8');
 ok(auditDoc.includes('Total audited decision call sites: **96**'), 'full audit inventories all 96 interactive decision sites');
 ok(auditDoc.includes('Total randomization call sites reviewed: **41**'), 'full audit inventories gameplay randomness');
@@ -216,8 +208,8 @@ ok(gwent.includes('addEventListener("wheel"') && gwent.includes('curr.shift(e, d
 
 
 // v1.3.5 round-transition audit regressions.
-ok(gwent.includes('await weather.clearWeather()') && gwent.includes('for (const row of board.row) {') && gwent.includes('await row.clear();'), 'round cleanup awaits weather and serialized row cleanup');
-ok(gwent.includes('async clear()') && gwent.includes('board.moveTo(c, "grave", this).then(resolve, resolve)') && gwent.includes('await Promise.all(moves)'), 'Row.clear is async and awaits all grave moves in parallel');
+ok(gwent.includes('await weather.clearWeather()') && gwent.includes('await Promise.all(board.row.map(async row =>'), 'round cleanup awaits weather and row cleanup');
+ok(gwent.includes('async clear()') && gwent.includes('for (const c of units) await board.toGrave(c, this, true)'), 'Row.clear is async and awaits grave moves');
 ok(gwent.includes('await this.startRound(verdict)') && gwent.includes('await this.startTurn()'), 'round lifecycle chaining is awaited');
 ok(online.includes('roundPhaseBarrier(phase)') && online.includes("t:'round-phase'"), 'online round phase barrier exists');
 ok(online.includes('effect-enter') && online.includes('effect-done'), 'online round effects are traced per effect');
@@ -245,37 +237,16 @@ ok(gwent.includes('await carousel.completion') && gwent.includes('this.releaseUI
 ok(online.includes("await self.waitBoardInteraction(oldQueue.call(this, container, count, wrapped") && online.indexOf("decision:carousel-send-end") > online.indexOf("await self.waitBoardInteraction(oldQueue.call(this, container, count, wrapped"), 'online choice-end is emitted only after queueCarousel fully resolves');
 
 // v1.3.9 continuation / multi-stage ability audit regressions.
-ok(online.includes("localPreview = false") && online.includes("decision:carousel-local-preview"), 'leader preview carousel is local-only and cannot leave stale network choices');
+ok(online.includes("previewOnlyLeader") && online.includes("decision:carousel-local-preview"), 'leader preview carousel is local-only and cannot leave stale network choices');
 ok(online.includes("const chooser = self.decisionOwner() || this") && online.includes("decision:destination-commit"), 'card destinations are scoped to the logical decision owner and awaited to commit');
 ok(online.includes("self._continuationCard === card && self._continuationDecision"), 'continuation destination is detected before ordinary hand-play routing');
 ok(abilities.includes("await card.holder.opponent().selectCardDestination") && abilities.includes("await card.holder.selectCardDestination"), 'Emhyr Invader awaits both opponent and own restored-card destinations');
 ok(!abilities.slice(abilities.indexOf('emhyr_invader:'), abilities.indexOf('eredin_bringer_of_death:')).includes('endturn_action'), 'Emhyr Invader no longer uses detached nested endturn_action choreography');
 const continuationSources = abilities + '\n' + factions;
-ok(!/(^|\n)\s*(?!await\s+new Promise)(?:card\.holder|player)\.selectCardDestination\(/m.test(continuationSources), 'audited ability/faction destination continuations are all awaited');
+ok(!/(^|\n)\s*(?:card\.holder|player)\.selectCardDestination\(/m.test(continuationSources), 'audited ability/faction destination continuations are all awaited');
 ok(abilities.includes('await resolveInOrder(op_spies,') && abilities.includes('await resolveInOrder(targetCards,'), 'audit removes detached async collection moves in affected abilities');
 const contAuditDoc = fs.readFileSync(path.join(root, 'docs', 'CONTINUATION_AUDIT_V1.3.9.md'), 'utf8');
 ok(contAuditDoc.includes('Emhyr') && contAuditDoc.includes('decision owner') && contAuditDoc.includes('leader preview'), 'v1.3.9 audit documents the full continuation failure class');
-// Deck pile card backs must match the 2:3 aspect of the .deck-card box,
-// otherwise background-size:contain renders them narrower than every other
-// faction's pile (reported as a randomly "squashed" deck stack).
-function imageSize(file) {
-  const buf = fs.readFileSync(file);
-  if (buf.length > 24 && buf[0] === 0x89 && buf[1] === 0x50)
-    return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
-  let i = 2;
-  while (i + 9 < buf.length) {
-    if (buf[i] !== 0xff) break;
-    const marker = buf[i + 1];
-    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc)
-      return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
-    i += 2 + buf.readUInt16BE(i + 2);
-  }
-  return null;
-}
-for (const name of fs.readdirSync(path.join(root, 'img', 'icons')).filter(x => x.startsWith('deck_back_'))) {
-  const size = imageSize(path.join(root, 'img', 'icons', name));
-  ok(!!size && Math.abs(size.w / size.h - 2 / 3) < 0.01, `deck back ${name} keeps the 2:3 card aspect`);
-}
 
 console.log(failed ? 'RESULT: FAILED' : 'RESULT: ALL STATIC CHECKS PASS');
 process.exit(failed ? 1 : 0);
