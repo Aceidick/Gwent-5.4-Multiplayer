@@ -442,7 +442,6 @@ dragon_wrath: {
                 for (const c of cards.cards) {
                     if (c === targetCard) {
                         await board.toHand(c, card.holder.deck);
-                        if (typeof creditAamadDraw === "function") creditAamadDraw(card.holder, 1);
                     } else {
                         card.holder.deck.removeCard(c);
                         card.holder.deck.addCard(c);
@@ -549,17 +548,7 @@ dragon_wrath: {
                 grave.removeCard(res);
                 grave.addCard(res);
                 await res.animate("medic");
-                // Cards with several valid rows (agile variants) must let the
-                // player choose the destination. Single-row cards keep the
-                // previous automatic placement. selectCardDestination
-                // highlights every valid row, is online-aware and its callback
-                // resolves once the row choice has committed, so multiple medic
-                // picks (medicCount) resolve in order.
-                if (board.getAgileRows(res, card.holder).length > 1) {
-                    await new Promise(resolve => card.holder.selectCardDestination(res, grave, resolve));
-                } else {
-                    await res.autoplay(grave);
-                }
+                await res.autoplay(grave);
             });
         }
     },
@@ -1949,7 +1938,8 @@ eredin_commander: {
             } else {
                 await ui.queueCarousel(board.getRow(card, "hand", card.holder), 1, (c, i) => wrapper.card = c.cards[i], c => c.isUnit(), true);
             }
-            await wrapper.card.autoplay(card.holder.hand);
+            await wrapper.card.autoplay();
+            card.holder.hand.removeCard(wrapper.card);
             if (card.holder.deck.cards.length > 0)
                 await card.holder.deck.draw(card.holder.hand);
         },
@@ -3118,8 +3108,6 @@ omen: {
             let myRunes = player.deck.cards.filter(c => c && c.key && runeKeys.includes(c.key));
             
             if (!myRunes || myRunes.length === 0) {
-                if (typeof ui !== "undefined" && ui.notification && !(player.controller instanceof ControllerAI))
-                    await ui.notification("trade-no-runestone", 2000);
                 return; 
             }
             
@@ -3250,42 +3238,49 @@ ofiri_envoy: {
         name: "Aamad, the Wise",
         description: "Whenever you draw a card, you gain +1 total power for this round permanently (resets upon round completion back to 0).",
         gameStart: (card, player) => {
-            const aamadPlayers = [player_me, player_op].filter(p => p && p.leader && p.leader.abilities && p.leader.abilities.includes("ofir_aamad"));
-            for (const p of aamadPlayers) {
-                if (!p.aamadBonus) p.aamadBonus = 0;
+            if (player_me && player_me.leader && player_me.leader.abilities && player_me.leader.abilities.includes("ofir_aamad")) {
+                if (!player_me.aamadBonus) player_me.aamadBonus = 0;
+                
+                if (player_me.deck && typeof player_me.deck.draw === "function" && !player_me.deck.draw._isPatched) {
+                    const originalDrawMe = player_me.deck.draw.bind(player_me.deck);
+                    player_me.deck.draw = async function(hand) {
+                        const result = await originalDrawMe(hand);
+                        player_me.aamadBonus = (player_me.aamadBonus || 0) + 1;
+                        player_me.total += 1;
+                        if (typeof board !== "undefined" && board.updateLeader) board.updateLeader();
+                        else if (player_me.updateTotal) player_me.updateTotal(0);
+                        return result;
+                    };
+                    player_me.deck.draw._isPatched = true; // Candado anti-duplicación
+                }
             }
-            for (const owner of [player_me, player_op]) {
-                if (!owner || !owner.deck || typeof owner.deck.draw !== "function" || owner.deck.draw._isPatched) continue;
-                const originalDraw = owner.deck.draw.bind(owner.deck);
-                owner.deck.draw = async function(hand) {
-                    const result = await originalDraw(hand);
-                    const recipient = (hand && hand.player) ? hand.player : owner;
-                    if (recipient && recipient.leader && recipient.leader.abilities && recipient.leader.abilities.includes("ofir_aamad")) {
-                        recipient.aamadBonus = (recipient.aamadBonus || 0) + 1;
-                        if (typeof recipient.updateTotal === "function") recipient.updateTotal(1);
-                        else recipient.total += 1;
-                        updateAamadCounterUI(recipient, true);
-                    }
-                    return result;
-                };
-                owner.deck.draw._isPatched = true; // Candado anti-duplicación
-            }
-            for (const p of aamadPlayers) updateAamadCounterUI(p, false);
 
+            if (player_op && player_op.leader && player_op.leader.abilities && player_op.leader.abilities.includes("ofir_aamad")) {
+                if (!player_op.aamadBonus) player_op.aamadBonus = 0;
+                
+                if (player_op.deck && typeof player_op.deck.draw === "function" && !player_op.deck.draw._isPatched) {
+                    const originalDrawOp = player_op.deck.draw.bind(player_op.deck);
+                    player_op.deck.draw = async function(hand) {
+                        const result = await originalDrawOp(hand);
+                        player_op.aamadBonus = (player_op.aamadBonus || 0) + 1;
+                        player_op.total += 1;
+                        if (typeof board !== "undefined" && board.updateLeader) board.updateLeader();
+                        else if (player_op.updateTotal) player_op.updateTotal(0);
+                        return result;
+                    };
+                    player_op.deck.draw._isPatched = true; // Candado anti-duplicación
+                }
+            }
             
             game.roundStart.push(async () => {
                 if (player_me && player_me.aamadBonus && player_me.aamadBonus > 0) {
-                    if (typeof player_me.updateTotal === "function") player_me.updateTotal(-player_me.aamadBonus);
-                    else player_me.total -= player_me.aamadBonus;
+                    player_me.total -= player_me.aamadBonus;
                     player_me.aamadBonus = 0;
                 }
                 if (player_op && player_op.aamadBonus && player_op.aamadBonus > 0) {
-                    if (typeof player_op.updateTotal === "function") player_op.updateTotal(-player_op.aamadBonus);
-                    else player_op.total -= player_op.aamadBonus;
+                    player_op.total -= player_op.aamadBonus;
                     player_op.aamadBonus = 0;
                 }
-                updateAamadCounterUI(player_me, false);
-                updateAamadCounterUI(player_op, false);
                 if (typeof board !== "undefined" && board.updateLeader) {
                     board.updateLeader();
                 }
@@ -4557,7 +4552,7 @@ doppler: {
 
 novigrad_sigismund: {
 		name: "Sigismund Dijkstra",
-		description: "Once per game, you may prevent the death of a friendly unit (not Heroes).",
+		description: "Once per game, prevent the first death of a friendly unit.",
 		        gameStart: (card, player) => {
             let actualPlayer = player || (card ? card.holder : null);
             if (!actualPlayer) return;
@@ -4575,34 +4570,3 @@ novigrad_sigismund: {
 		}
 	},
 };
-
-// Credits an ad-hoc card acquisition as a draw for "Aamad, the Wise" (ofir_aamad):
-// abilities that move a card into a player's hand without going through
-// Deck.draw() (e.g. the Toussaint spy "keep one of three" pick) must still
-// count as the player drawing a card.
-function creditAamadDraw(player, count = 1) {
-    if (!player || !player.leader || !player.leader.abilities || !player.leader.abilities.includes("ofir_aamad")) return;
-    for (let i = 0; i < count; i++) {
-        player.aamadBonus = (player.aamadBonus || 0) + 1;
-        if (typeof player.updateTotal === "function") player.updateTotal(1);
-        else player.total += 1;
-    }
-    if (typeof updateAamadCounterUI === "function") updateAamadCounterUI(player, true);
-}
-
-// Updates the "Aamad, the Wise" bonus counter badge next to the player's total
-// score. The badge is only visible while the leader ability has accumulated a
-// round bonus, so players can see the passive ability is active.
-function updateAamadCounterUI(player, animate) {
-    if (typeof document === "undefined" || !player || !player.tag) return;
-    const badge = document.getElementById("aamad-bonus-" + player.tag);
-    if (!badge) return;
-    const bonus = player.aamadBonus || 0;
-    badge.innerHTML = "+" + bonus;
-    badge.classList.toggle("hide", bonus <= 0);
-    if (animate && bonus > 0) {
-        badge.classList.remove("aamad-bonus-pulse");
-        void badge.offsetWidth;
-        badge.classList.add("aamad-bonus-pulse");
-    }
-}
